@@ -507,6 +507,7 @@ const settings = createSettings((key, v) => {
   else if (key === 'music') sound.setMusic(v);
   else if (key === 'filter') post.mode = v;
   else if (key === 'detail') { post.maxH = [540, 760, 1080][v]; resize(); }
+  else if (key === 'sharp') post.sharp = v ? 1 : 0;
 });
 
 // ---------------------------------------------------------------- camera

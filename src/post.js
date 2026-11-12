@@ -10,9 +10,39 @@ void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
 const KUWAHARA = /* glsl */ `
 precision highp float;
 uniform sampler2D tDiffuse;
+uniform sampler2D tDepth;
 uniform vec2 texel;
+uniform float sharp;      // 1: far-off things are painted with a fine knife instead of the broad one
+uniform vec2 clip;        // the camera's near and far planes, to turn the depth buffer back into a distance
 varying vec2 vUv;
+
+// The same knife at its smallest: each stroke only two pixels across. It tidies edges but keeps the detail.
+vec3 fineKnife() {
+  vec3 best = vec3(0.0); float minV = 1e9;
+  for (int q = 0; q < 4; q++) {
+    vec2 o = vec2(q == 1 || q == 2 ? 0.0 : -1.0, q >= 2 ? 0.0 : -1.0);
+    vec3 m = vec3(0.0), s = vec3(0.0);
+    for (int j = 0; j <= 1; j++) for (int i = 0; i <= 1; i++) {
+      vec3 c = sqrt(max(texture2D(tDiffuse, vUv + (o + vec2(float(i), float(j))) * texel).rgb, 0.0)); m += c; s += c * c;
+    }
+    m *= 0.25; s = abs(s * 0.25 - m * m);
+    float v = s.r + s.g + s.b;
+    if (v < minV) { minV = v; best = m; }
+  }
+  return best * best;
+}
+
 void main() {
+  // The broad knife smears a fixed number of pixels, so it eats the detail of anything small on screen, which is
+  // to say anything far away. With "sharp" on, it gives way to the fine knife between about 40 and 130 units off.
+  float far = 0.0;
+  if (sharp > 0.5) {
+    float z = texture2D(tDepth, vUv).r * 2.0 - 1.0;
+    float dist = 2.0 * clip.x * clip.y / (clip.y + clip.x - z * (clip.y - clip.x));
+    far = smoothstep(38.0, 130.0, dist);
+  }
+  vec3 fine = far > 0.001 ? fineKnife() : vec3(0.0);
+  if (far > 0.999) { gl_FragColor = vec4(fine, 1.0); return; }
   vec3 m0 = vec3(0.0), m1 = vec3(0.0), m2 = vec3(0.0), m3 = vec3(0.0);
   vec3 s0 = vec3(0.0), s1 = vec3(0.0), s2 = vec3(0.0), s3 = vec3(0.0);
   for (int j = -RADIUS; j <= 0; j++) for (int i = -RADIUS; i <= 0; i++) {
@@ -34,7 +64,7 @@ void main() {
   m = m1 / n; s = abs(s1 / n - m * m); v = s.r + s.g + s.b; if (v < minV) { minV = v; best = m; }
   m = m2 / n; s = abs(s2 / n - m * m); v = s.r + s.g + s.b; if (v < minV) { minV = v; best = m; }
   m = m3 / n; s = abs(s3 / n - m * m); v = s.r + s.g + s.b; if (v < minV) { minV = v; best = m; }
-  gl_FragColor = vec4(best * best, 1.0);
+  gl_FragColor = vec4(mix(best * best, fine, far), 1.0);
 }
 `;
 
@@ -115,13 +145,15 @@ export class Painterly {
     this.flash = 0;
     this.sat = 1.22;
     this.bloom = 1;
+    this.sharp = 0;         // 1: far-off things keep their detail (the broad knife eases off with distance)
     this.maxH = 1080;       // the picture is painted at no more than this many rows, then scaled to the window
     const rtOpts = { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true };
-    this.rtScene = new THREE.WebGLRenderTarget(4, 4, rtOpts);
+    // (the scene's depth is kept as a texture, so the knife can tell near from far)
+    this.rtScene = new THREE.WebGLRenderTarget(4, 4, { ...rtOpts, depthTexture: new THREE.DepthTexture(4, 4) });
     this.rtK = new THREE.WebGLRenderTarget(4, 4, { ...rtOpts, depthBuffer: false });
     const mk = (radius) => new THREE.ShaderMaterial({
       defines: { RADIUS: radius },
-      uniforms: { tDiffuse: { value: null }, texel: { value: new THREE.Vector2() } },
+      uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, texel: { value: new THREE.Vector2() }, sharp: { value: 0 }, clip: { value: new THREE.Vector2(0.3, 2600) } },
       vertexShader: VERT, fragmentShader: KUWAHARA, depthTest: false, depthWrite: false,
     });
     this.matK = [null, mk(3), mk(5)];
@@ -158,6 +190,7 @@ export class Painterly {
   filter(texture, target, w, h) {
     const r = this.renderer, m = this.matK[1], prev = r.getRenderTarget();
     m.uniforms.tDiffuse.value = texture; m.uniforms.texel.value.set(1 / w, 1 / h);
+    m.uniforms.sharp.value = 0;                      // a picture on an easel is painted with the broad knife throughout
     this.quad.material = m;
     r.setRenderTarget(target); r.render(this.qScene, this.qCam); r.setRenderTarget(prev);
   }
@@ -170,6 +203,8 @@ export class Painterly {
     if (this.mode > 0) {
       const m = this.matK[this.mode];
       m.uniforms.tDiffuse.value = src;
+      m.uniforms.tDepth.value = this.rtScene.depthTexture;
+      m.uniforms.sharp.value = this.sharp; m.uniforms.clip.value.set(camera.near, camera.far);
       m.uniforms.texel.value.set(1 / this.iw, 1 / this.ih);
       this.quad.material = m;
       r.setRenderTarget(this.rtK);

@@ -11,6 +11,7 @@ export const DEFAULTS = {
   follow: true,     // the camera drifts round behind the painter when left alone
   filter: 2,        // 0 plain, 1 painterly, 2 heavy impasto
   detail: 2,        // 0 soft, 1 standard, 2 fine: how many pixels the picture is painted at
+  sharp: false,     // far-off things keep their detail, instead of being smeared by the brushwork
 };
 const RANGE = { volume: [0, 1], music: [0, 1], look: [0.4, 2], filter: [0, 2], detail: [0, 2] };
 
