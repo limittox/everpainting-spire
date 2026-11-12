@@ -155,7 +155,29 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button === 2) pressed.add('NextPaint');
 });
 addEventListener('mouseup', (e) => { dragging = false; if (e.button === 0) keys.delete('Attack'); });
+// A captured mouse sometimes reports a single enormous movement out of nowhere: a known quirk of some browser and
+// mouse combinations, and common in the instant after the pointer is captured or the window regains focus. One such
+// event is enough to spin the view half-way round. So: nothing counts for a moment after capture or refocus, and a
+// movement that is both large and wildly out of line with the ones just before it is dropped. A genuine fast flick
+// builds up over a few events, or carries on in the same direction, so it gets through.
+const mouse = { pace: 0, at: 0, quietUntil: 0, dropAt: -1e9, dropSign: 0, dropped: 0 };
+const settleMouse = () => { mouse.quietUntil = performance.now() + 150; mouse.pace = 0; };
+function plausible(e) {
+  const now = performance.now();
+  mouse.pace *= Math.exp(-(now - mouse.at) / 150); mouse.at = now;
+  if (now < mouse.quietUntil) return false;
+  const mag = Math.hypot(e.movementX, e.movementY), sign = Math.sign(e.movementX);
+  if (mag > 100 && mag > 6 * mouse.pace + 80 && !(now - mouse.dropAt < 80 && sign === mouse.dropSign)) {
+    mouse.dropAt = now; mouse.dropSign = sign; mouse.dropped++;
+    return false;
+  }
+  mouse.pace += (mag - mouse.pace) * 0.5;
+  return true;
+}
+document.addEventListener('pointerlockchange', settleMouse);
+addEventListener('focus', settleMouse);
 addEventListener('mousemove', (e) => {
+  if ((game.state === 'photo' || game.state === 'play') && !plausible(e)) return;
   if (game.state === 'photo') {
     if (document.pointerLockElement === canvas || dragging) {
       const look = settings.values.look;
@@ -523,13 +545,18 @@ function updateCamera(dt, snap = false) {
   if (playing && game.intro < 1) game.intro = Math.min(1, game.intro + dt / 3.6);
   const k = game.intro * game.intro * (3 - 2 * game.intro);
 
-  // left alone, the camera drifts round to look where the painter is going
+  // Left alone, the camera settles to a comfortable height, and while a wind is carrying the painter it turns to
+  // look along the current. It does not turn to follow ordinary walking. The controls are relative to the camera, so
+  // if the view turned toward a painter who is walking sideways, "sideways" would turn with it, and the two would
+  // chase each other round: holding A used to swing the view right round by itself.
   game.lookIdle += dt;
   if (playing && settings.values.follow && game.lookIdle > 1.8 && Math.hypot(player.vel.x, player.vel.z) > 2.5) {
-    const d = angDiff(player.heading - Math.PI, game.yaw);
-    const w = (0.5 + 0.5 * Math.cos(d)) * Math.min(1, (game.lookIdle - 1.8) / 1.5);   // but never swings round when walking toward it
-    game.yaw += d * w * (1 - Math.exp(-(player.ride ? 1.8 : 0.7) * dt));
-    game.pitch += ((player.ride || player.gliding ? 0.3 : 0.16) - game.pitch) * w * (1 - Math.exp(-0.5 * dt));
+    const ramp = Math.min(1, (game.lookIdle - 1.8) / 1.5);
+    if (player.ride) {
+      const d = angDiff(player.heading - Math.PI, game.yaw);
+      game.yaw += d * (0.5 + 0.5 * Math.cos(d)) * ramp * (1 - Math.exp(-1.8 * dt));
+    }
+    game.pitch += ((player.ride || player.gliding ? 0.3 : 0.16) - game.pitch) * ramp * (1 - Math.exp(-0.5 * dt));
   }
   const q = snap ? 1 : 1 - Math.exp(-18 * dt);
   view.yaw += angDiff(game.yaw, view.yaw) * q; view.pitch += (game.pitch - view.pitch) * q;
@@ -1152,4 +1179,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // small debug handle for the console
-window.__game = { game, player, world, post, camera, secrets, interior, sketches, pieces, sights, photo, openPhoto, closePhoto, fillBook, secondJourney, findSecret, enterSpire, leaveSpire, reachNest, blots, sparks, keys, pressed, garden, sound, painter, vistas, day, settings, store, saveGame, snapshot, openMenu, closeMenu, begin, doSwing, openGallery, sitDown, standUp, step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); draw(); }, tp(i) { const isl = world.islands[i]; const p = new V3(isl.x, 0, isl.z + isl.r * 0.5); p.y = world.groundHeight(p.x, p.z, 1e9); player.teleport(p); } };
+window.__game = { game, player, world, post, camera, secrets, interior, sketches, pieces, sights, photo, mouse, openPhoto, closePhoto, fillBook, secondJourney, findSecret, enterSpire, leaveSpire, reachNest, blots, sparks, keys, pressed, garden, sound, painter, vistas, day, settings, store, saveGame, snapshot, openMenu, closeMenu, begin, doSwing, openGallery, sitDown, standUp, step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); draw(); }, tp(i) { const isl = world.islands[i]; const p = new V3(isl.x, 0, isl.z + isl.r * 0.5); p.y = world.groundHeight(p.x, p.z, 1e9); player.teleport(p); } };
