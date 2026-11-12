@@ -16,7 +16,7 @@ import { GROWS, WARMS } from './seedbed.js';
 
 const V3 = THREE.Vector3, TAU = Math.PI * 2;
 const MIRE = { x: -6, y: 30, z: 3780, r: 20, ph: 0.7, name: 'The Overpainted Place', pale: true };
-const PAGE = { x: 0, y: 34, z: 3696, r: 22, ph: 3.9, name: 'The Blank Page', pale: true };
+export const PAGE = { x: 0, y: 34, z: 3696, r: 22, ph: 3.9, name: 'The Blank Page', pale: true };
 const BLANK = [4];                                        // Cream
 const MUD = ['#6b4a3a', '#7d5a48', '#5a4040', '#84604a', '#4f3c44', '#8a6a58'];
 const WELLS = [

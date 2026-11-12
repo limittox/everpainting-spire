@@ -19,6 +19,7 @@ import { Sights } from './sights.js';
 import { Underpainting } from './underpainting.js';
 import { Seedbed } from './seedbed.js';
 import { LastPage } from './lastpage.js';
+import { Gallery } from './gallery.js';
 import { clamp, lerp, glowTexture } from './util.js';
 
 const V3 = THREE.Vector3;
@@ -46,6 +47,7 @@ const interior = new Interior(scene, world);
 const under = new Underpainting(scene, world, uTime, interior.center);
 const seedbed = new Seedbed(scene, world, uTime, under);
 const lastpage = new LastPage(scene, world, uTime, under, seedbed);          // the end of it: old paint to wipe away, four wells, and sunrise          // onward from the Dry Stair: vines, warm air, the Kiln
+const gallery = new Gallery(scene, world, uTime, lastpage, interior.center);                   // the third level: a gallery, and pictures to step into
 const busy = [world.spawn, world.gate, ...world.sparkSpots, ...world.blotSpots.map((b) => b.p), ...world.dropSpots, ...world.bridges.map((b) => b.anchor)];
 const vistas = new Vistas(scene, world, renderer, [...busy, ...secrets.avoid], post);
 interior.hang(vistas.spots);
@@ -216,6 +218,7 @@ function begin() {
   sound.start();
   canvas.requestPointerLock?.()?.catch?.(() => {});
   if (new URLSearchParams(location.search).has('underpainting') && !under.contains(player.pos)) { enterUnder(); return; }
+  if (new URLSearchParams(location.search).has('gallery') && !gallery.contains(player.pos)) { galleryAct({ type: 'door', door: gallery.doors[0] }); return; }
   const here = game.resumed ? world.islandAt(player.pos.x, player.pos.z) : null;
   setTimeout(() => (game.resumed ? hud.toast(here ? here.name : 'The Everpainting Spire', 'Where you left off') : hud.toast('Lantern Rise', game.journey > 1 ? 'The first stroke, again' : 'The first stroke')), 2800);
 }
@@ -273,6 +276,7 @@ function fillBook() {
   const have = palette();
   row('Paints', (v) => { for (const [i, p] of PAINTS.entries()) { const d = add('i', have.includes(i) ? 'dot' : 'dot none'); if (have.includes(i)) d.style.background = p.hex; d.title = have.includes(i) ? p.name : ''; v.appendChild(d); } });
   row('The Spire', (v) => names(v, [['The last stroke', game.won], ['The atelier', !!game.hints.atelier], ['The crow\u2019s nest', !!game.hints.nest], ['The great brush', !!game.reach]]));
+  if (game.hints.hung) row('Varnishing Day', (v) => names(v, [['The Flood', gallery.dry], ['High Summer', gallery.watered]]));
   if (game.hints.under) row('The Underpainting', (v) => names(v, [['The Dry Stair', under.done], ['The Seedbed', seedbed.grown], ['The Kiln', seedbed.lit], ['The Overpainted Place', lastpage.cleared], ['The Blank Page', lastpage.done]]));
   const mins = Math.max(1, Math.round(game.playT / 60));
   row('Wandering', (v) => v.appendChild(add('span', '', `${mins} minute${mins === 1 ? '' : 's'}${game.journey > 1 ? `, on your ${nth(game.journey)} journey` : ''}`)));
@@ -453,7 +457,7 @@ function snapshot() {
     vistas: vistas.spots.map((v) => (v.done ? 1 : 0)),
     won: game.won, dayGoal: r2(game.dayGoal), paint: game.paint, playT: Math.round(game.playT), hints: Object.keys(game.hints),
     journey: game.journey, keep: game.keep,
-    garden: garden.save(), strikes: painter.log, secrets: secrets.save(), sketches: sketches.save(), pieces: pieces.save(), under: under.save(), seedbed: seedbed.save(), lastpage: lastpage.save(), reach: !!game.reach,
+    garden: garden.save(), strikes: painter.log, secrets: secrets.save(), sketches: sketches.save(), pieces: pieces.save(), under: under.save(), seedbed: seedbed.save(), lastpage: lastpage.save(), gallery: gallery.save(), reach: !!game.reach,
   };
 }
 function saveGame() { if (game.started) store.write(snapshot()); }
@@ -478,6 +482,7 @@ function restore(d) {
   under.load(d.under);
   seedbed.load(d.seedbed);
   lastpage.load(d.lastpage);
+  gallery.load(d.gallery);
   painter.replay(d.strikes);
   (d.vistas || []).forEach((done, i) => {
     const v = vistas.spots[i], url = v && done ? store.picture(i) : null;
@@ -852,6 +857,27 @@ function leaveUnder() {
   sound.play('wind');
   hud.toast('The Atelier', 'Inside the Spire', 3200);
 }
+/** Varnishing Day: stepping through a frame, or lifting something with the brush, or laying it down. */
+function galleryAct(a) {
+  if (a.type === 'door') {
+    const d = a.door;
+    moveTo(d.to.pos, d.to.heading, d.to.yaw ?? d.to.heading + Math.PI);
+    game.hints.hung = true;
+    if (d.to.island !== undefined) game.shownIsland = d.to.island;
+    sound.play(d.out ? 'wind' : 'vista');
+    hud.toast(d.toast[0], d.toast[1], 4200);
+    if (gallery.where(d.to.pos) === 'hall') hint('hung', 'Paintings, the day before the doors open. Not all of them are finished.', 8000);
+    return;
+  }
+  const ev = gallery.act(a);
+  player.swing();
+  sound.play('pour'); sound.pluck(true);
+  fx.burst(ev.at, 34, { speed: 4.5, up: ev.type === 'lift' ? 7 : 4, colors: ['#8fdcff', '#58c0e8', '#ffffff'], size: 0.36, life: 1.0, gravity: ev.type === 'lift' ? 3 : 9 });
+  if (ev.type === 'lift') hint('lifted', 'The brush is holding the water now. Carry it to a picture that wants it.', 8500);
+  else if (!ev.finished) hint('laid', 'It stays where you lay it. Anything you take can be put back.', 7500);
+  if (ev.finished) { sound.play('vista'); post.flash = 0.2; hud.toast(ev.finished[0], ev.finished[1], 5200); cheerAll(); }
+  saveSoon();
+}
 function reachNest() {
   moveTo(interior.nest.pos, interior.nest.heading, -Math.PI / 2);
   sound.play('vista');
@@ -1060,6 +1086,7 @@ function updatePlay(dt, t) {
       prompt = '<kbd>E</kbd>Step back into the atelier';
       if (pressed.has('KeyE')) { leaveUnder(); return; }
     }
+    if (lastpage.done && lastpage.sunK >= 1) hint('frame', 'A frame is standing at the north edge of the page. There is somewhere on the other side of it.', 9000);
     if (!game.hints.dry && under.drySpring(player.pos)) hint('dry', 'A dry spring. It wants a colour that runs.', 7500);
     const thing = lastpage.waiting(player.pos);
     if (thing) hint(thing.key, thing.line, 7500);
@@ -1068,6 +1095,14 @@ function updatePlay(dt, t) {
     if (seedbed.onRock(player.pos) && !seedbed.warm.length) hint('gap', 'The next rock is too far to glide to. Warm colours make the air rise: paint the ground.', 9000);
     if (!seedbed.kiln.hex && player.pos.distanceTo(seedbed.kiln.pos) < 10) hint('kiln', 'A cold kiln. It wants a colour that burns.', 7500);
   }
+  // --- Varnishing Day: frames to step through, and things the brush can lift and lay down
+  const todo = player.grounded ? gallery.near(player.pos) : null;
+  if (todo) {
+    prompt = '<kbd>E</kbd>' + todo.text;
+    if (pressed.has('KeyE')) { galleryAct(todo); if (todo.type === 'door') return; }
+  }
+  const hung = gallery.where(player.pos);
+  if (hung) { const thing = gallery.waiting(player.pos); if (thing) hint(thing.key, thing.line, 8500); }
   // --- an easel and a stool: somewhere to sit
   if (!prompt && player.grounded) {
     const v = vistas.near(player.pos);
@@ -1091,6 +1126,7 @@ function updatePlay(dt, t) {
   } else if (world.bridges[3].progress < 1) { goal = world.bridges[3].anchor; objective = 'Lay the last bridge to the Spire'; }
   else { goal = world.gate; objective = 'Step up to the glowing gate'; }
   if (pale) { goal = null; objective = !under.done ? 'Bring the Dry Stair its water' : !seedbed.grown ? 'Grow the way on' : !seedbed.lit ? 'Cross to the Kiln on warm air' : !lastpage.cleared ? 'Ride the Kiln\u2019s warm air north' : !lastpage.done ? 'Fill the four wells' : 'It is morning'; }      // nothing in the first level to point at from here
+  if (hung) { goal = null; objective = gallery.done ? 'Two pictures are finished. The others are not hung yet' : gallery.carry ? 'Find somewhere that wants water' : 'One picture has too much, another too little'; }
   hud.objective(objective);
   game.guideT -= dt;
   if (goal && game.guideT <= 0 && !player.ride && !player.lift) {
@@ -1220,7 +1256,10 @@ function tick(dt) {
   // (the wells can be reached without wiping the old paint, by gliding past it: the sun still comes all the way up)
   const dawn = lastpage.done ? 1 : [under.done, seedbed.vines[0].progress >= 1, seedbed.vines[1].progress >= 1, seedbed.lit, lastpage.cleared, lastpage.done].filter(Boolean).length / 6;
   game.dawn = game.dawn === undefined ? dawn : game.dawn + (dawn - game.dawn) * (1 - Math.exp(-0.5 * dt));
-  day.set(game.day, paper, game.dawn);
+  gallery.found = !!game.hints.hung;
+  gallery.update(dt, time, game.state === 'title' ? null : player);
+  const hung = gallery.look(camera.position);
+  day.set(game.day, hung ? hung.name : paper ? 'paper' : null, hung ? hung.at : game.dawn);
   post.ink += ((paper ? 1 : 0) - post.ink) * (1 - Math.exp(-8 * dt));
   world.sky.position.copy(camera.position);
   sound.flow(game.state === 'play' ? game.flow : 0);
@@ -1297,4 +1336,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // small debug handle for the console
-window.__game = { game, player, world, post, camera, secrets, interior, sketches, pieces, sights, under, seedbed, lastpage, enterUnder, leaveUnder, photo, mouse, openPhoto, closePhoto, fillBook, secondJourney, findSecret, enterSpire, leaveSpire, reachNest, blots, sparks, keys, pressed, garden, sound, painter, vistas, day, settings, store, saveGame, snapshot, openMenu, closeMenu, begin, doSwing, openGallery, sitDown, standUp, step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); draw(); }, tp(i) { const isl = world.islands[i]; const p = new V3(isl.x, 0, isl.z + isl.r * 0.5); p.y = world.groundHeight(p.x, p.z, 1e9); player.teleport(p); } };
+window.__game = { game, player, world, post, camera, secrets, interior, sketches, pieces, sights, under, seedbed, lastpage, gallery, galleryAct, enterUnder, leaveUnder, photo, mouse, openPhoto, closePhoto, fillBook, secondJourney, findSecret, enterSpire, leaveSpire, reachNest, blots, sparks, keys, pressed, garden, sound, painter, vistas, day, settings, store, saveGame, snapshot, openMenu, closeMenu, begin, doSwing, openGallery, sitDown, standUp, step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); draw(); }, tp(i) { const isl = world.islands[i]; const p = new V3(isl.x, 0, isl.z + isl.r * 0.5); p.y = world.groundHeight(p.x, p.z, 1e9); player.teleport(p); } };

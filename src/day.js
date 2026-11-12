@@ -82,20 +82,51 @@ const PAPERS = [
     sun: hex(0xffd9a8), sunI: 2.1, sunPos: dir(-0.2, 0.5, -0.8), far: hex(0xf2dcc8), tint: hex(0xfffaf0) },
 ];
 
+// Varnishing Day. The gallery is a room: plaster overhead and an even light from a skylight. Each picture has its own
+// weather, which changes as the painter puts it right.
+const ROOM = { ...PAPER,
+  top: rgb(0.80, 0.74, 0.66), mid: rgb(0.90, 0.85, 0.77), hor: rgb(0.97, 0.93, 0.85), low: rgb(0.78, 0.70, 0.62),
+  cream: rgb(1.0, 0.97, 0.90), rose: rgb(0.93, 0.86, 0.78), violet: rgb(0.74, 0.66, 0.60), blue: rgb(0.80, 0.74, 0.68),
+  sunCol: rgb(1.0, 0.95, 0.85), sunDir: dir(0, 0.9, -0.3),
+  fog: hex(0xe6dccb), hemiSky: hex(0xfff6e8), hemiGround: hex(0xb89a80), hemiI: 1.5,
+  sun: hex(0xfff2dc), sunI: 1.5, sunPos: dir(0.2, 1.0, 0.3), far: hex(0xe0d4c2), cloud: hex(0x9a8a7a), tint: hex(0xfffaf2) };
+const RAIN = { ...PAPER,
+  top: rgb(0.36, 0.42, 0.52), mid: rgb(0.50, 0.56, 0.64), hor: rgb(0.68, 0.72, 0.76), low: rgb(0.52, 0.58, 0.66),
+  cream: rgb(0.80, 0.83, 0.86), rose: rgb(0.62, 0.66, 0.72), violet: rgb(0.42, 0.46, 0.56), blue: rgb(0.38, 0.44, 0.56),
+  sunCol: rgb(0.8, 0.85, 0.9), fog: hex(0x93a0ac), hemiSky: hex(0xd6e0ea), hemiGround: hex(0x6e8088), hemiI: 1.25,
+  sun: hex(0xdfe8f2), sunI: 1.0, far: hex(0x98a4b0), cloud: hex(0x56606e), tint: hex(0xf2f6ff) };
+const WASHED = { ...PAPER,
+  top: rgb(0.30, 0.50, 0.92), mid: rgb(0.55, 0.70, 0.97), hor: rgb(0.92, 0.90, 0.86), low: rgb(0.76, 0.80, 0.94),
+  cream: rgb(1.0, 0.97, 0.90), rose: rgb(0.98, 0.82, 0.84), violet: rgb(0.60, 0.60, 0.86), blue: rgb(0.36, 0.50, 0.90),
+  sunCol: rgb(1.1, 0.95, 0.7), fog: hex(0xbcd0ee), hemiSky: hex(0xf0f6ff), hemiGround: hex(0x9ab890), hemiI: 1.55,
+  sun: hex(0xfff4dc), sunI: 2.0, far: hex(0xdfe8f6), cloud: hex(0x7a84a0), tint: hex(0xffffff) };
+const BLAZE = { ...PAPER,
+  top: rgb(0.42, 0.62, 0.96), mid: rgb(0.78, 0.84, 0.96), hor: rgb(1.0, 0.96, 0.80), low: rgb(0.98, 0.90, 0.70),
+  cream: rgb(1.0, 1.0, 0.94), rose: rgb(1.0, 0.92, 0.78), violet: rgb(0.86, 0.80, 0.74), blue: rgb(0.62, 0.74, 0.95),
+  sunCol: rgb(1.8, 1.6, 1.1), sunDir: dir(-0.1, 0.34, -1), fog: hex(0xf6e8c0), hemiSky: hex(0xfffbe8), hemiGround: hex(0xe0b070), hemiI: 1.75,
+  sun: hex(0xfff6d8), sunI: 2.7, sunPos: dir(-0.15, 1.0, -0.35), far: hex(0xfaf0d0), cloud: hex(0xb0a080), tint: hex(0xfffbe6) };
+const LOOKS = {
+  paper: PAPERS,
+  hall: [{ t: 0, ...ROOM }, { t: 1, ...ROOM }],
+  flood: [{ t: 0, ...RAIN }, { t: 1, ...WASHED }],
+  summer: [{ t: 0, ...BLAZE }, { t: 1, ...BLAZE, hemiGround: hex(0xb8c880), fog: hex(0xeef0c8) }],
+};
+
 export class Day {
   constructor(world, post) {
     this.sky = world.sky.material.uniforms; this.L = world.light; this.post = post;
-    this.t = -1; this.paper = false; this.dawn = 0;
+    this.t = -1; this.look = null; this.at = 0;
     this.set(0);
   }
 
   /** t: 0 morning, 0.33 midday, 0.68 golden hour, 1 dusk, 1.25 night. */
-  /** `paper`: the camera is in the Underpainting, whose own day is `dawn` (0 night .. 1 sunrise). */
-  set(t, paper = false, dawn = 0) {
+  /** `look`: the camera is somewhere with a sky of its own ('paper' is the Underpainting), which is `at` far along (0..1). */
+  set(t, look = null, at = 0) {
     t = Math.max(0, Math.min(KEYS[KEYS.length - 1].t, t));
-    if (Math.abs(t - this.t) < 1e-4 && paper === this.paper && Math.abs(dawn - this.dawn) < 1e-3) return;
-    this.t = t; this.paper = paper; this.dawn = dawn;
-    const keys = paper ? PAPERS : KEYS, at = paper ? Math.max(0, Math.min(1, dawn)) : t;
+    if (Math.abs(t - this.t) < 1e-4 && look === this.look && Math.abs(at - this.at) < 1e-3) return;
+    this.t = t; this.look = look; this.at = at;
+    const keys = look ? LOOKS[look] : KEYS;
+    at = look ? Math.max(0, Math.min(1, at)) : t;
     let i = 0;
     while (i < keys.length - 2 && at > keys[i + 1].t) i++;
     const a = keys[i], b = keys[i + 1], k = (at - a.t) / (b.t - a.t);

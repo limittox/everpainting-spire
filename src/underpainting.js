@@ -99,7 +99,7 @@ export function terraceTop(isl, r0, r1, y, K = 10, S = 72) {
 }
 
 /** The rock the island hangs on: the same sort of shape as the others, in graphite. */
-export function underside(isl, J = 8, S = 40) {
+export function underside(isl, J = 8, S = 40, pal = [...GRAPHITE, ...STONE]) {
   const depth = isl.r * 1.15 + 7, pos = [];
   const P = (j, s) => {
     const th = (s / S) * TAU, t = j / J, nz = noise3(Math.cos(th) * 2.2 + isl.ph, t * 3.1, Math.sin(th) * 2.2);
@@ -114,7 +114,7 @@ export function underside(isl, J = 8, S = 40) {
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  return daub(g, [...GRAPHITE, ...STONE], { scale: 0.08, stretch: [1, 0.25, 1] });
+  return daub(g, pal, { scale: 0.08, stretch: [1, 0.25, 1] });
 }
 
 /** An island in pencil: its ground canvas, its top, the rock under it; and from then on an island like any other. */
@@ -152,7 +152,7 @@ void main() {
 }`;
 
 /** A ribbon of water along `pts`. `sideOf(i)` gives the direction across it at each point (for water falling down a wall). */
-function makeStream(scene, uTime, pts, width, sideOf = null) {
+export function makeStream(scene, uTime, pts, width, sideOf = null) {
   const pos = [], uv = [], idx = [], side = new V3(), tan = new V3(), up = new V3(0, 1, 0);
   let len = 0;
   const run = pts.map((p, i) => (i ? (len += p.distanceTo(pts[i - 1])) : 0));

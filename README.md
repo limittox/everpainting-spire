@@ -49,6 +49,15 @@ It ends on the Blank Page, where four wells each want one of the four, under the
 
 You reach it by stepping into the unfinished canvas in the Spire's atelier, after the ending. To try it straight away, add `?underpainting` to the address.
 
+### Varnishing Day (in progress)
+
+A third level is being built: the gallery where the painting hangs, the day before the doors open. The pictures on its walls are nearly finished. Each has too much of one thing and not enough of another, and here the brush learns to carry: stand by something, press E to lift it, and lay it down in another picture.
+
+- **The Flood**: a drowned orchard. Lift the water and the ground comes back, ring by ring.
+- **High Summer**: a parched field with a dry spring and a dry mill pond, each waiting for a brushful.
+
+The brush holds one thing at a time, and anything laid down can be lifted again. You reach the gallery through a frame that stands on the Blank Page once the Underpainting is finished; after that a frame in the atelier leads straight there. To try it straight away, add `?gallery` to the address.
+
 ## Running it yourself
 
 You need [Node.js](https://nodejs.org/) 18 or newer.
@@ -94,6 +103,7 @@ The game is written in plain JavaScript with [three.js](https://threejs.org/) an
 | `src/sketches.js`, `src/setpieces.js`, `src/secrets.js` | Sketches, the island set-pieces and the hidden places |
 | `src/interior.js`, `src/sights.js` | Inside the Spire, and the far-off sights |
 | `src/underpainting.js`, `src/seedbed.js`, `src/lastpage.js` | The second level: running water, growing vines, warm air, and its ending |
+| `src/gallery.js` | The third level: the gallery, its pictures, and lifting and carrying |
 | `src/day.js`, `src/audio.js` | Time of day; music and sound |
 | `src/hud.js`, `src/settings.js`, `src/save.js` | On-screen prompts and map, the settings panel, and storage |
 | `src/util.js` | Shared helpers: palettes, noise, stroke geometry |
