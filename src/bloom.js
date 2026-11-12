@@ -128,6 +128,7 @@ export class Garden {
     const spots = [];
     const taken = avoid.map((p) => ({ x: p.x, z: p.z, r: 3.6 }));
     for (const isl of world.islands) {
+      if (isl.pale) continue;                       // (islands of later levels: nothing sleeps there yet)
       const want = Math.round(isl.r * 0.6);
       let placed = 0, tries = 0;
       while (placed < want && tries++ < 900) {

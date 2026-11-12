@@ -118,6 +118,11 @@ void main() {
   gl_FragColor = vec4(vec3(1.25), clamp(a, 0.0, 0.96));          // a touch brighter than white, so the outline glows a little
 }`;
 
+/** The material of something drawn but not yet painted: white outlines on the air. */
+export function ghostMaterial(uTime) {
+  return new THREE.ShaderMaterial({ uniforms: { time: uTime }, vertexShader: GHOST_VERT, fragmentShader: GHOST_FRAG, transparent: true, depthWrite: false, fog: false });
+}
+
 const pop = (u) => 1 - (1 - u) ** 3 + Math.sin(u * Math.PI) * 0.2;
 const tonesOf = (hex) => { const c = new THREE.Color(hex); return [0, 0.08, -0.08, 0.15, -0.14].map((l) => '#' + c.clone().offsetHSL(0, 0, l).getHexString()); };
 
@@ -125,7 +130,7 @@ export class Sketches {
   /** `keepClear` is a list of { x, z, r }: places already spoken for. */
   constructor(scene, world, uTime, keepClear = []) {
     this.scene = scene; this.world = world;
-    this.ghostMat = new THREE.ShaderMaterial({ uniforms: { time: uTime }, vertexShader: GHOST_VERT, fragmentShader: GHOST_FRAG, transparent: true, depthWrite: false, fog: false });
+    this.ghostMat = ghostMaterial(uTime);
     this.realMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, emissive: 0x2a2026 }), { scale: 1.2 });
     this.items = [];
     this.events = [];

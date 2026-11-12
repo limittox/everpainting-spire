@@ -28,7 +28,7 @@ function edgePoint(isl, tx, tz, inset, lift = 0.22) {
 
 // ------------------------------------------------------------------ islands
 const TOP_SPAN = 1.22;          // island texture covers a square of 2 * r * TOP_SPAN
-function islandTopGeo(isl, K = 22, S = 72) {
+export function islandTopGeo(isl, K = 22, S = 72) {
   const pos = [], uv = [], idx = [];
   for (let k = 0; k <= K; k++) for (let i = 0; i <= S; i++) {
     const th = (i / S) * TAU, rad = (rimR(isl, th) * k) / K;
@@ -828,7 +828,7 @@ export function buildWorld(scene, uTime) {
         const px = a.x + ex * t - x, pz = a.z + ez * t - z, d2 = px * px + pz * pz;
         if (d2 < near) { near = d2; h = a.y + (b.y - a.y) * t; along = i + t; }
       }
-      if (h > land && land > -Infinity) {
+      if (h > land && land > -Infinity && !br.raised) {
         // where the stroke lies on an island it is a soft ridge, not a kerb: its height eases down to the ground
         // at its sides and at its two ends, so stepping on or off it is a ramp rather than a jolt
         // (the sides only ease near the ends: by the island's rim the stroke is at its full height right across,

@@ -189,9 +189,11 @@ export class Player {
     }
     // gliding: hold jump while falling and the cloak catches the air, trading gravity for a slow, even sink
     const wasGliding = this.gliding;
-    this.gliding = !this.grounded && input.jumpHeld && this.vel.y < -1.2;
+    const up = this.updraft || 0;        // warm air rising under the painter (set by the game, in the Underpainting)
+    this.gliding = !this.grounded && input.jumpHeld && (this.vel.y < -1.2 || up > 0);
     if (this.gliding) {
-      this.vel.y += (-2.4 - this.vel.y) * (1 - Math.exp(-6 * dt));
+      if (up > 0) this.vel.y += (up - this.vel.y) * (1 - Math.exp(-3.2 * dt));       // the cloak fills, and the air carries it up
+      else this.vel.y += (-2.4 - this.vel.y) * (1 - Math.exp(-6 * dt));
       if (!wasGliding) ev.push('glide');
     } else this.vel.y -= 27 * dt;
     if (this.vel.y < -40) this.vel.y = -40;

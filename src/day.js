@@ -56,21 +56,32 @@ const KEYS = [
   },
 ];
 
+// The Underpainting: a world still in pencil. Paper sky, graphite cloud, and a white, even light that adds no
+// colour of its own, so the only colour there is whatever the painter brings.
+const PAPER = {
+  top: rgb(0.78, 0.78, 0.83), mid: rgb(0.87, 0.86, 0.88), hor: rgb(0.96, 0.94, 0.90), low: rgb(0.90, 0.88, 0.86),
+  cream: rgb(1.0, 0.99, 0.96), rose: rgb(0.86, 0.85, 0.88), violet: rgb(0.62, 0.62, 0.68), blue: rgb(0.70, 0.71, 0.76),
+  sunCol: rgb(1.0, 0.98, 0.92), sunDir: dir(0, 0.25, -1), stars: 0,
+  fog: hex(0xece7dc), hemiSky: hex(0xffffff), hemiGround: hex(0xb9b6c2), hemiI: 1.5,
+  sun: hex(0xfff8ec), sunI: 1.7, sunPos: dir(-0.5, 0.9, 0.4),
+  far: hex(0xd8d6dc), cloud: hex(0x8a8894), sea: hex(0xffffff), tint: hex(0xffffff),
+};
+
 export class Day {
   constructor(world, post) {
     this.sky = world.sky.material.uniforms; this.L = world.light; this.post = post;
-    this.t = -1;
+    this.t = -1; this.paper = false;
     this.set(0);
   }
 
   /** t: 0 morning, 0.33 midday, 0.68 golden hour, 1 dusk, 1.25 night. */
-  set(t) {
+  set(t, paper = false) {
     t = Math.max(0, Math.min(KEYS[KEYS.length - 1].t, t));
-    if (Math.abs(t - this.t) < 1e-4) return;
-    this.t = t;
+    if (Math.abs(t - this.t) < 1e-4 && paper === this.paper) return;
+    this.t = t; this.paper = paper;
     let i = 0;
     while (i < KEYS.length - 2 && t > KEYS[i + 1].t) i++;
-    const a = KEYS[i], b = KEYS[i + 1], k = (t - a.t) / (b.t - a.t);
+    const a = paper ? PAPER : KEYS[i], b = paper ? PAPER : KEYS[i + 1], k = paper ? 0 : (t - a.t) / (b.t - a.t);
     const u = this.sky, L = this.L;
     u.top.value.lerpColors(a.top, b.top, k); u.mid.value.lerpColors(a.mid, b.mid, k); u.hor.value.lerpColors(a.hor, b.hor, k); u.low.value.lerpColors(a.low, b.low, k);
     u.cCream.value.lerpColors(a.cream, b.cream, k); u.cRose.value.lerpColors(a.rose, b.rose, k); u.cViolet.value.lerpColors(a.violet, b.violet, k); u.cBlue.value.lerpColors(a.blue, b.blue, k);

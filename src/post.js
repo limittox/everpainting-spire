@@ -115,8 +115,14 @@ uniform float relief;
 uniform float sat;
 uniform float flash;
 uniform vec3 tint;
+uniform sampler2D tDepth;
+uniform vec2 clip;
+uniform float ink;        // 0..1: how strongly outlines are drawn in pencil (the Underpainting)
 varying vec2 vUv;
 float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+// one over the distance, up to a constant: it varies evenly across any flat surface, so it only "bends" where
+// one thing ends and another begins, or where a surface turns a corner
+float inv(vec2 uv) { return clip.y - textureLod(tDepth, uv, 0.0).r * (clip.y - clip.x); }
 void main() {
   vec3 c = texture2D(tK, vUv).rgb;
 
@@ -137,6 +143,16 @@ void main() {
   c *= (1.0 + shade * 0.9) * tint;
   c = 1.0 - (1.0 - min(c, 1.0)) * (1.0 - min(pow(glow, vec3(1.0 / 2.2)), 1.0) * 0.55);   // screen the glow in, so it never clips
 
+  if (ink > 0.001) {
+    // a pencil line wherever the picture has an edge: outlines and creases from the depth, and a fainter
+    // line where two flat tones meet
+    vec2 o = texel * 1.3;
+    float w = inv(vUv);
+    float bend = abs(inv(vUv - vec2(o.x, 0.0)) + inv(vUv + vec2(o.x, 0.0)) - 2.0 * w) + abs(inv(vUv - vec2(0.0, o.y)) + inv(vUv + vec2(0.0, o.y)) - 2.0 * w);
+    float line = smoothstep(0.012, 0.06, bend / max(w, 1e-4));
+    line = max(line, smoothstep(0.07, 0.22, abs(hR - hL) + abs(hU - hD)) * 0.45);
+    c = mix(c, vec3(0.2, 0.19, 0.25), line * ink * 0.8);
+  }
   float l = lum(c);
   c = mix(vec3(l), c, sat);
   c = (c - 0.5) * 1.07 + 0.5;
@@ -154,6 +170,7 @@ export class Painterly {
     this.flash = 0;
     this.sat = 1.22;
     this.bloom = 1;
+    this.ink = 0;           // 0..1: pencil outlines over the picture (the Underpainting is drawn, not painted)
     this.sharp = 0;         // 1: things keep their detail with distance (the knife narrows the further off it works)
     this.maxH = 1080;       // the picture is painted at no more than this many rows, then scaled to the window
     const rtOpts = { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true };
@@ -174,6 +191,7 @@ export class Painterly {
       uniforms: {
         tK: { value: null }, texel: { value: new THREE.Vector2() }, tBloom: { value: null }, bloom: { value: 1 },
         relief: { value: 1 }, sat: { value: 1.2 }, flash: { value: 0 }, tint: { value: new THREE.Color(1, 1, 1) },
+        tDepth: { value: null }, clip: { value: new THREE.Vector2(0.3, 2600) }, ink: { value: 0 },
       },
       vertexShader: VERT, fragmentShader: FINAL, depthTest: false, depthWrite: false,
     });
@@ -234,6 +252,7 @@ export class Painterly {
     u.tK.value = src;
     u.relief.value = this.mode === 0 ? 0.0 : this.mode === 1 ? 1.0 : 1.5;
     u.sat.value = this.sat;
+    u.tDepth.value = this.rtScene.depthTexture; u.clip.value.set(camera.near, camera.far); u.ink.value = this.ink;
     u.flash.value = this.flash;
     this.quad.material = this.matFinal;
     r.setRenderTarget(null);

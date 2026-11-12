@@ -18,6 +18,8 @@ const SPOTS = [
   // on the crow's nest at the top of the Spire (see interior.js): exactly here, on whatever ground is highest
   // (the easel's eye is set high, to see over the last stroke where it winds past the deck)
   { fixed: true, x: 0, z: -301, target: [6, 27, -120], name: 'Everything, from the top', cam: { back: 3, up: 3.0, tilt: 0.1, fov: 0, eye: 4.6 } },
+  // the Underpainting (see underpainting.js): on top of the Dry Stair, looking out past the great pencil
+  { fixed: true, x: 4.6, z: 4205.8, target: [70, 34, 4330], name: 'The Dry Stair, coloured in', cam: { back: 6.5, up: 2.6, tilt: 0.16, fov: 4, eye: 2.4 } },
 ];
 const CAM = { back: 9.2, up: 2.7, tilt: 0.18, fov: 7, eye: 1.9 };
 const PAINT_SECONDS = 11;

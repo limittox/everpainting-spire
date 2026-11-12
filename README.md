@@ -36,6 +36,16 @@ There is no combat and nothing to fail. If you fall, the paint carries you back.
 
 The journey is saved in your browser as you play.
 
+### The Underpainting (in progress)
+
+A second level is being built: a world still in pencil, where colour does things. Three islands are playable so far.
+
+- **Water** (Turquoise or Sky): paint a dry spring and water follows its channel, turns a wheel, and the wheel works a lift to the next terrace.
+- **Growth** (Leaf): paint a sketched seed and a vine grows along the trellis drawn for it, into a bridge or a ramp.
+- **Warmth** (Ember or Gold): painted ground gives off rising air. Jump in, hold Space, and it lifts you high enough to glide to places that were out of reach.
+
+You reach it by stepping into the unfinished canvas in the Spire's atelier, after the ending. To try it straight away, add `?underpainting` to the address.
+
 ## Running it yourself
 
 You need [Node.js](https://nodejs.org/) 18 or newer.
@@ -80,6 +90,7 @@ The game is written in plain JavaScript with [three.js](https://threejs.org/) an
 | `src/entities.js` | Particles, sparks and companions |
 | `src/sketches.js`, `src/setpieces.js`, `src/secrets.js` | Sketches, the island set-pieces and the hidden places |
 | `src/interior.js`, `src/sights.js` | Inside the Spire, and the far-off sights |
+| `src/underpainting.js`, `src/seedbed.js` | The second level: running water, growing vines and warm air |
 | `src/day.js`, `src/audio.js` | Time of day; music and sound |
 | `src/hud.js`, `src/settings.js`, `src/save.js` | On-screen prompts and map, the settings panel, and storage |
 | `src/util.js` | Shared helpers: palettes, noise, stroke geometry |
