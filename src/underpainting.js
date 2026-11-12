@@ -117,6 +117,17 @@ export function underside(isl, J = 8, S = 40) {
   return daub(g, [...GRAPHITE, ...STONE], { scale: 0.08, stretch: [1, 0.25, 1] });
 }
 
+/** An island in pencil: its ground canvas, its top, the rock under it; and from then on an island like any other. */
+export function pencilIsland(scene, world, bag, def, size, seed) {
+  const isl = { ...def, index: world.islands.length }, big = isl.r > 10;
+  isl.tex = pencilGround(isl, size, [], [], seed); isl.span = 2 * isl.r * SPAN;
+  world.islands.push(isl);
+  const mat = paintify(new THREE.MeshLambertMaterial({ map: isl.tex }), { scale: 1, amp: 0.45 });
+  scene.add(new THREE.Mesh(islandTopGeo(isl, big ? 22 : 10, big ? 72 : 40), mat));
+  bag.add(underside(isl, big ? 8 : 5, big ? 40 : 22));
+  return { isl, mat };
+}
+
 // ------------------------------------------------------------------------------------------------ running water
 const WATER_VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 const WATER_FRAG = /* glsl */ `

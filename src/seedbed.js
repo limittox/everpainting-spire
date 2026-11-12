@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { rimR, surfY, islandTopGeo } from './world.js';
+import { rimR, surfY } from './world.js';
 import { ghostMaterial } from './sketches.js';
 import { daub, place, Bag, paintify, glowSprite, glowTexture, strokeGeo, clamp } from './util.js';
 import { PAINTS } from './paint.js';
-import { STAIR, pencilGround, terraceTop, underside, PAPER, GRAPHITE, STONE, SPAN } from './underpainting.js';
+import { STAIR, pencilIsland, terraceTop, PAPER, GRAPHITE, STONE } from './underpainting.js';
 
 // The Underpainting, onward from the Dry Stair. Two more colours turn out to have a nature:
 //
@@ -29,20 +29,11 @@ export class Seedbed {
   constructor(scene, world, uTime, under) {
     this.scene = scene; this.world = world; this.under = under; this.uTime = uTime;
     const bag = (this.bag = new Bag()), add = (g, pal, o) => bag.add(daub(g, pal, o));
-    const topMat = (tex) => paintify(new THREE.MeshLambertMaterial({ map: tex }), { scale: 1, amp: 0.45 });
     this.realMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, emissive: 0x18171c }), { scale: 1.1, amp: 0.5 });
     this.vineMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { scale: 1 });
 
     // --- four more islands in pencil: the Seedbed, two cinders to cross by, and the Kiln
-    const island = (def, size, seed) => {
-      const isl = { ...def, index: world.islands.length };
-      isl.tex = pencilGround(isl, size, [], [], seed); isl.span = 2 * isl.r * SPAN;
-      world.islands.push(isl);
-      const mat = topMat(isl.tex);
-      scene.add(new THREE.Mesh(islandTopGeo(isl, isl.r > 10 ? 22 : 10, isl.r > 10 ? 72 : 40), mat));
-      bag.add(underside(isl, isl.r > 10 ? 8 : 5, isl.r > 10 ? 40 : 22));
-      return { isl, mat };
-    };
+    const island = (def, size, seed) => pencilIsland(scene, world, bag, def, size, seed);
     const seed = island(SEED, 2048, 2203); this.seedbed = seed.isl;
     this.cinders = CINDERS.map((c, k) => island(c, 512, 2210 + k).isl);
     this.kilnIsle = island(KILN, 1024, 2231).isl;
@@ -82,7 +73,7 @@ export class Seedbed {
       const b1 = end(1.3), b0 = end(6.5); b1.y = surfY(SEED, b1.x, b1.z) + 0.14; b0.y = surfY(SEED, b0.x, b0.z) + 0.12;
       const curve = new THREE.CatmullRomCurve3([new V3(STAIR.x, 11.06, STAIR.z - 8.6), new V3(STAIR.x, 11.12, STAIR.z - 11.4), new V3(STAIR.x + 3, 13.6, STAIR.z - 30), new V3(STAIR.x - 2.5, 15.2, STAIR.z - 48), b1, b0]);
       const vine = this.makeVine(curve.getSpacedPoints(64), 1.7, 5.5);
-      this.makeSeed(new V3(STAIR.x + 2.4, 11, STAIR.z - 8.2), vine, 'A sketched seed, and a trellis leading away. It wants a colour that grows.');
+      this.makeSeed(new V3(STAIR.x + 2.4, 11, STAIR.z - 8.2), vine, 'A sketched seed, and a trellis leading away. It wants a colour that grows.', () => under.done);
     }
     {
       // round and up the rock in the middle of the Seedbed, and in over its edge at the top
@@ -156,13 +147,13 @@ export class Seedbed {
   }
 
   /** A seed pod drawn at the foot of a vine's trellis. */
-  makeSeed(pos, vine, line) {
+  makeSeed(pos, vine, line, when = null) {
     const ghost = new THREE.Group();
     const pod = new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 1).scale(1, 1.45, 1), ghostMaterial(this.uTime)); pod.position.y = 1.15;
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.11, 0.7, 5), pod.material); stem.position.y = 0.35;
     ghost.add(pod, stem); ghost.position.copy(pos);
     this.scene.add(ghost);
-    const s = { pos, vine, line, ghost, real: null, hex: null, top: new V3(pos.x, pos.y + 1.2, pos.z), index: this.seeds.length };
+    const s = { pos, vine, line, when, ghost, real: null, hex: null, top: new V3(pos.x, pos.y + 1.2, pos.z), index: this.seeds.length };
     this.seeds.push(s);
     return s;
   }
@@ -204,7 +195,7 @@ export class Seedbed {
     return { warm, first };
   }
 
-  get grown() { return this.vines.every((v) => v.progress >= 1); }
+  get grown() { return this.vines.slice(0, 2).every((v) => v.progress >= 1); }
   get lit() { return this.kiln.lit; }
 
   /** How fast the air is rising under this point: warm ground below, or the lit Kiln. Zero if there is none. */
@@ -228,12 +219,17 @@ export class Seedbed {
     if (!this.under.contains(p)) return out;
     const hit = (q, reach = 3.3) => Math.abs(q.y - p.y) < 3 && ((q.x - x) ** 2 + (q.z - z) ** 2 < reach * reach || (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < 2.7 * 2.7);
     for (const s of this.seeds) {
-      if (s.hex === hex || !s.ghost.parent || (s.index === 0 && !this.under.done) || !hit(s.pos)) continue;
+      if (s.hex === hex || (s.when && !s.when()) || !hit(s.pos)) continue;
       const already = s.vine.growing || s.vine.progress >= 1, grows = this.setSeed(s, hex);
       out.push({ type: grows ? (already ? 'recolour' : 'grow') : already ? 'recolour' : 'barren', at: s.top });
     }
     const k = this.kiln;
     if (k.hex !== hex && hit(k.pos, 5.4)) { const res = this.lightKiln(hex); out.push({ type: res.first ? 'kiln' : res.warm ? 'recolour' : 'cold', at: k.top }); }
+    if (PAINTS.findIndex((q) => q.hex === hex) === 4) {
+      const cold = this.warm.filter((q) => (q.x - x) ** 2 + (q.z - z) ** 2 < 16 && Math.abs(q.y - p.y) < 3);
+      for (const q of cold) { this.scene.remove(q.decal); this.warm.splice(this.warm.indexOf(q), 1); }
+      if (cold.length) out.push({ type: 'cool', at: new V3(x, p.y + 0.6, z) });
+    }
     // warm paint on any ground here leaves that ground warm
     if (WARMS.includes(PAINTS.findIndex((q) => q.hex === hex))) {
       const g = this.world.groundHeight(x, z, p.y + 1.5);
@@ -262,10 +258,8 @@ export class Seedbed {
 
   update(dt, t, player) {
     const ev = this.events; ev.length = 0;
-    // the first seed and its trellis are only drawn in once the Dry Stair runs
-    const first = this.seeds[0], shown = this.under.done;
-    first.vine.shown = shown; first.ghost.visible = shown && !first.hex;
-    if (first.real) first.real.visible = true;
+    // a seed and its trellis may be waiting on something (the Dry Stair running, old paint being wiped away)
+    for (const s of this.seeds) { const shown = !s.when || s.when(); s.vine.shown = shown; s.ghost.visible = shown && !s.hex; }
     for (const v of this.vines) {
       if (v.growing && v.progress < 1) { v.set(v.progress + dt / v.seconds); if (v.progress >= 1) { v.growing = false; ev.push({ type: 'grown', at: v.pts[v.N], vine: v }); } }
       else v.set(v.progress);

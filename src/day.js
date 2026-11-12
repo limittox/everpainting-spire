@@ -67,21 +67,38 @@ const PAPER = {
   far: hex(0xd8d6dc), cloud: hex(0x8a8894), sea: hex(0xffffff), tint: hex(0xffffff),
 };
 
+// It begins at night and ends at sunrise: the paper is dark until the painter has done enough to bring the day.
+const PAPERS = [
+  { t: 0, ...PAPER,
+    top: rgb(0.30, 0.31, 0.42), mid: rgb(0.42, 0.42, 0.52), hor: rgb(0.60, 0.58, 0.62), low: rgb(0.50, 0.49, 0.55),
+    cream: rgb(0.74, 0.73, 0.78), rose: rgb(0.56, 0.55, 0.62), violet: rgb(0.36, 0.36, 0.46), blue: rgb(0.34, 0.35, 0.46),
+    sunCol: rgb(0.8, 0.8, 0.9), stars: 0.5, fog: hex(0x9b99a8), hemiSky: hex(0xcfd0e6), hemiGround: hex(0x7c7a8c), hemiI: 1.15,
+    sun: hex(0xd8dcf2), sunI: 1.0, far: hex(0x9a98a8), tint: hex(0xeef0ff) },
+  { t: 0.7, ...PAPER },
+  { t: 1, ...PAPER,
+    top: rgb(0.62, 0.70, 0.90), mid: rgb(0.93, 0.80, 0.74), hor: rgb(1.0, 0.86, 0.62), low: rgb(0.96, 0.80, 0.70),
+    cream: rgb(1.0, 0.95, 0.84), rose: rgb(1.0, 0.78, 0.72), violet: rgb(0.74, 0.66, 0.80), blue: rgb(0.66, 0.72, 0.90),
+    sunCol: rgb(1.5, 1.05, 0.6), sunDir: dir(0, 0.12, -1), fog: hex(0xf6e2c8), hemiSky: hex(0xfff4e6), hemiGround: hex(0xd9b6a8),
+    sun: hex(0xffd9a8), sunI: 2.1, sunPos: dir(-0.2, 0.5, -0.8), far: hex(0xf2dcc8), tint: hex(0xfffaf0) },
+];
+
 export class Day {
   constructor(world, post) {
     this.sky = world.sky.material.uniforms; this.L = world.light; this.post = post;
-    this.t = -1; this.paper = false;
+    this.t = -1; this.paper = false; this.dawn = 0;
     this.set(0);
   }
 
   /** t: 0 morning, 0.33 midday, 0.68 golden hour, 1 dusk, 1.25 night. */
-  set(t, paper = false) {
+  /** `paper`: the camera is in the Underpainting, whose own day is `dawn` (0 night .. 1 sunrise). */
+  set(t, paper = false, dawn = 0) {
     t = Math.max(0, Math.min(KEYS[KEYS.length - 1].t, t));
-    if (Math.abs(t - this.t) < 1e-4 && paper === this.paper) return;
-    this.t = t; this.paper = paper;
+    if (Math.abs(t - this.t) < 1e-4 && paper === this.paper && Math.abs(dawn - this.dawn) < 1e-3) return;
+    this.t = t; this.paper = paper; this.dawn = dawn;
+    const keys = paper ? PAPERS : KEYS, at = paper ? Math.max(0, Math.min(1, dawn)) : t;
     let i = 0;
-    while (i < KEYS.length - 2 && t > KEYS[i + 1].t) i++;
-    const a = paper ? PAPER : KEYS[i], b = paper ? PAPER : KEYS[i + 1], k = paper ? 0 : (t - a.t) / (b.t - a.t);
+    while (i < keys.length - 2 && at > keys[i + 1].t) i++;
+    const a = keys[i], b = keys[i + 1], k = (at - a.t) / (b.t - a.t);
     const u = this.sky, L = this.L;
     u.top.value.lerpColors(a.top, b.top, k); u.mid.value.lerpColors(a.mid, b.mid, k); u.hor.value.lerpColors(a.hor, b.hor, k); u.low.value.lerpColors(a.low, b.low, k);
     u.cCream.value.lerpColors(a.cream, b.cream, k); u.cRose.value.lerpColors(a.rose, b.rose, k); u.cViolet.value.lerpColors(a.violet, b.violet, k); u.cBlue.value.lerpColors(a.blue, b.blue, k);

@@ -18,6 +18,7 @@ import { SetPieces } from './setpieces.js';
 import { Sights } from './sights.js';
 import { Underpainting } from './underpainting.js';
 import { Seedbed } from './seedbed.js';
+import { LastPage } from './lastpage.js';
 import { clamp, lerp, glowTexture } from './util.js';
 
 const V3 = THREE.Vector3;
@@ -43,7 +44,8 @@ const secrets = new Secrets(scene, world);
 const interior = new Interior(scene, world);
 // the second level: a world in pencil, a long way off, reached through a canvas in the atelier
 const under = new Underpainting(scene, world, uTime, interior.center);
-const seedbed = new Seedbed(scene, world, uTime, under);          // onward from the Dry Stair: vines, warm air, the Kiln
+const seedbed = new Seedbed(scene, world, uTime, under);
+const lastpage = new LastPage(scene, world, uTime, under, seedbed);          // the end of it: old paint to wipe away, four wells, and sunrise          // onward from the Dry Stair: vines, warm air, the Kiln
 const busy = [world.spawn, world.gate, ...world.sparkSpots, ...world.blotSpots.map((b) => b.p), ...world.dropSpots, ...world.bridges.map((b) => b.anchor)];
 const vistas = new Vistas(scene, world, renderer, [...busy, ...secrets.avoid], post);
 interior.hang(vistas.spots);
@@ -271,7 +273,7 @@ function fillBook() {
   const have = palette();
   row('Paints', (v) => { for (const [i, p] of PAINTS.entries()) { const d = add('i', have.includes(i) ? 'dot' : 'dot none'); if (have.includes(i)) d.style.background = p.hex; d.title = have.includes(i) ? p.name : ''; v.appendChild(d); } });
   row('The Spire', (v) => names(v, [['The last stroke', game.won], ['The atelier', !!game.hints.atelier], ['The crow\u2019s nest', !!game.hints.nest], ['The great brush', !!game.reach]]));
-  if (game.hints.under) row('The Underpainting', (v) => names(v, [['The Dry Stair', under.done], ['The Seedbed', seedbed.grown], ['The Kiln', seedbed.lit]]));
+  if (game.hints.under) row('The Underpainting', (v) => names(v, [['The Dry Stair', under.done], ['The Seedbed', seedbed.grown], ['The Kiln', seedbed.lit], ['The Overpainted Place', lastpage.cleared], ['The Blank Page', lastpage.done]]));
   const mins = Math.max(1, Math.round(game.playT / 60));
   row('Wandering', (v) => v.appendChild(add('span', '', `${mins} minute${mins === 1 ? '' : 's'}${game.journey > 1 ? `, on your ${nth(game.journey)} journey` : ''}`)));
   if (done === total) el.appendChild(add('div', 'full', 'Everything is found, and everything is painted. The sketchbook is full.'));
@@ -451,7 +453,7 @@ function snapshot() {
     vistas: vistas.spots.map((v) => (v.done ? 1 : 0)),
     won: game.won, dayGoal: r2(game.dayGoal), paint: game.paint, playT: Math.round(game.playT), hints: Object.keys(game.hints),
     journey: game.journey, keep: game.keep,
-    garden: garden.save(), strikes: painter.log, secrets: secrets.save(), sketches: sketches.save(), pieces: pieces.save(), under: under.save(), seedbed: seedbed.save(), reach: !!game.reach,
+    garden: garden.save(), strikes: painter.log, secrets: secrets.save(), sketches: sketches.save(), pieces: pieces.save(), under: under.save(), seedbed: seedbed.save(), lastpage: lastpage.save(), reach: !!game.reach,
   };
 }
 function saveGame() { if (game.started) store.write(snapshot()); }
@@ -475,6 +477,7 @@ function restore(d) {
   pieces.load(d.pieces);
   under.load(d.under);
   seedbed.load(d.seedbed);
+  lastpage.load(d.lastpage);
   painter.replay(d.strikes);
   (d.vistas || []).forEach((done, i) => {
     const v = vistas.spots[i], url = v && done ? store.picture(i) : null;
@@ -721,7 +724,23 @@ function doSwing() {
   }
   garden.wakeNear(player.pos, 5.2);
   for (const { sketch, fresh } of sketches.strike(sx, sz, player.pos, hex)) paintSketch(sketch, fresh, hex);
-  for (const ev of seedbed.strike(sx, sz, player.pos, hex)) {
+  const sown = seedbed.strike(sx, sz, player.pos, hex);          // (first: the swing that uncovers a seed must not also paint it)
+  for (const ev of lastpage.strike(sx, sz, player.pos, hex)) {
+    if (ev.type === 'smear') { hud.hint('More paint will not shift it. Cream takes paint back to paper.', 6500); continue; }
+    if (ev.type === 'wrong') { hud.hint(ev.line, 6500); continue; }
+    const big = ev.type === 'dawn';
+    fx.burst(ev.at, big ? 120 : 30, { speed: big ? 10 : 4.5, up: big ? 11 : 5, colors: big ? ['#fff6d0', '#ffd27a', '#ffffff', '#ff9a5a'] : [hex, '#ffffff'], size: big ? 0.55 : 0.36, life: big ? 2.2 : 1.0, gravity: big ? 2 : 8, boost: big ? 1.5 : 1 });
+    if (ev.type === 'wipe') { sound.play('paint'); sound.pluck(true); if (!ev.seed) hint('wiped', 'It comes away. Cream is blank: it takes paint back to paper.', 6500); }
+    else if (ev.type === 'well') { sound.play('blossom'); sound.pluck(true); }
+    else if (big) {
+      // all four wells are full: the hand draws the sun, and it is morning in the Underpainting
+      post.flash = 0.35; sound.play('finale');
+      hud.toast('It is morning', 'The Underpainting is finished', 6500);
+      cheerAll();
+    }
+    saveSoon();
+  }
+  for (const ev of sown) {
     if (ev.type === 'warm') {
       // warm paint leaves the ground warm: the air over it rises
       if (ev.fresh) { fx.burst(ev.at, 20, { speed: 2.5, up: 6, colors: [hex, '#ffe2a0', '#ffffff'], size: 0.32, life: 1.3, gravity: 1 }); sound.play('glide'); }
@@ -731,11 +750,12 @@ function doSwing() {
       fx.burst(ev.at, big ? 90 : 28, { speed: big ? 9 : 4.5, up: big ? 10 : 5, colors: [hex, hex, '#ffffff'], size: big ? 0.5 : 0.36, life: big ? 1.8 : 1.0, gravity: big ? 3 : 8 });
       if (ev.type === 'grow') { sound.play('blossom'); sound.pluck(true); hint('grows', 'It grows. A vine follows the trellis drawn for it.', 6500); }
       else if (ev.type === 'barren') hud.hint('It takes the colour, but nothing grows. Growing is another colour.', 6500);
+      else if (ev.type === 'cool') hud.hint('Cream takes the warmth back out of the ground.', 5500);
       else if (ev.type === 'cold') hud.hint('The Kiln takes the colour and stays cold. Fire is another colour.', 6500);
       else if (big) {
         post.flash = 0.3; sound.play('bridge'); sound.play('wind');
         hud.toast('The Kiln is lit', 'The Underpainting', 5400);
-        hud.hint('There is more of the Underpainting still to be drawn.', 9000);
+        hud.hint('The Kiln breathes: its warm air rises higher than any painted ground. Ride it north.', 10000);
         cheerAll();
       }
     }
@@ -1041,6 +1061,8 @@ function updatePlay(dt, t) {
       if (pressed.has('KeyE')) { leaveUnder(); return; }
     }
     if (!game.hints.dry && under.drySpring(player.pos)) hint('dry', 'A dry spring. It wants a colour that runs.', 7500);
+    const thing = lastpage.waiting(player.pos);
+    if (thing) hint(thing.key, thing.line, 7500);
     const pod = seedbed.waitingSeed(player.pos);
     if (pod) hint('seed' + pod.index, pod.line, 7500);
     if (seedbed.onRock(player.pos) && !seedbed.warm.length) hint('gap', 'The next rock is too far to glide to. Warm colours make the air rise: paint the ground.', 9000);
@@ -1068,7 +1090,7 @@ function updatePlay(dt, t) {
     objective = `Gather sparks of inspiration (${game.sparks}/3)`;
   } else if (world.bridges[3].progress < 1) { goal = world.bridges[3].anchor; objective = 'Lay the last bridge to the Spire'; }
   else { goal = world.gate; objective = 'Step up to the glowing gate'; }
-  if (pale) { goal = null; objective = !under.done ? 'Bring the Dry Stair its water' : !seedbed.grown ? 'Grow the way on' : !seedbed.lit ? 'Cross to the Kiln on warm air' : 'The Kiln is lit'; }      // nothing in the first level to point at from here
+  if (pale) { goal = null; objective = !under.done ? 'Bring the Dry Stair its water' : !seedbed.grown ? 'Grow the way on' : !seedbed.lit ? 'Cross to the Kiln on warm air' : !lastpage.cleared ? 'Ride the Kiln\u2019s warm air north' : !lastpage.done ? 'Fill the four wells' : 'It is morning'; }      // nothing in the first level to point at from here
   hud.objective(objective);
   game.guideT -= dt;
   if (goal && game.guideT <= 0 && !player.ride && !player.lift) {
@@ -1193,8 +1215,12 @@ function tick(dt) {
   // the day is as late as the farthest point the painter has reached, and it never runs backwards
   if (game.state === 'play') game.dayGoal = Math.max(game.dayGoal, clamp((world.spawn.z - player.pos.z) / (world.spawn.z - world.gate.z), 0, 1));
   game.day += (game.dayGoal - game.day) * (1 - Math.exp(-(game.state === 'finale' ? 0.5 : 0.2) * dt));
+  lastpage.update(dt, time);
   const paper = under.contains(camera.position);
-  day.set(game.day, paper);
+  // (the wells can be reached without wiping the old paint, by gliding past it: the sun still comes all the way up)
+  const dawn = lastpage.done ? 1 : [under.done, seedbed.vines[0].progress >= 1, seedbed.vines[1].progress >= 1, seedbed.lit, lastpage.cleared, lastpage.done].filter(Boolean).length / 6;
+  game.dawn = game.dawn === undefined ? dawn : game.dawn + (dawn - game.dawn) * (1 - Math.exp(-0.5 * dt));
+  day.set(game.day, paper, game.dawn);
   post.ink += ((paper ? 1 : 0) - post.ink) * (1 - Math.exp(-8 * dt));
   world.sky.position.copy(camera.position);
   sound.flow(game.state === 'play' ? game.flow : 0);
@@ -1271,4 +1297,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // small debug handle for the console
-window.__game = { game, player, world, post, camera, secrets, interior, sketches, pieces, sights, under, seedbed, enterUnder, leaveUnder, photo, mouse, openPhoto, closePhoto, fillBook, secondJourney, findSecret, enterSpire, leaveSpire, reachNest, blots, sparks, keys, pressed, garden, sound, painter, vistas, day, settings, store, saveGame, snapshot, openMenu, closeMenu, begin, doSwing, openGallery, sitDown, standUp, step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); draw(); }, tp(i) { const isl = world.islands[i]; const p = new V3(isl.x, 0, isl.z + isl.r * 0.5); p.y = world.groundHeight(p.x, p.z, 1e9); player.teleport(p); } };
+window.__game = { game, player, world, post, camera, secrets, interior, sketches, pieces, sights, under, seedbed, lastpage, enterUnder, leaveUnder, photo, mouse, openPhoto, closePhoto, fillBook, secondJourney, findSecret, enterSpire, leaveSpire, reachNest, blots, sparks, keys, pressed, garden, sound, painter, vistas, day, settings, store, saveGame, snapshot, openMenu, closeMenu, begin, doSwing, openGallery, sitDown, standUp, step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); draw(); }, tp(i) { const isl = world.islands[i]; const p = new V3(isl.x, 0, isl.z + isl.r * 0.5); p.y = world.groundHeight(p.x, p.z, 1e9); player.teleport(p); } };
