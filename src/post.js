@@ -14,16 +14,19 @@ uniform sampler2D tDepth;
 uniform vec2 texel;
 uniform float sharp;      // 1: far-off things are painted with a fine knife instead of the broad one
 uniform vec2 clip;        // the camera's near and far planes, to turn the depth buffer back into a distance
+const float REACH = 11.0; // with "sharp" on: how far from the camera the knife is still at its full width
 varying vec2 vUv;
 
 // The same knife at its smallest: each stroke only two pixels across. It tidies edges but keeps the detail.
+// (Both knives read the picture with textureLod: some pixels skip these loops, and an ordinary read inside a
+// skipped loop cannot tell which mip level it wants, which the shader compiler complains about.)
 vec3 fineKnife() {
   vec3 best = vec3(0.0); float minV = 1e9;
   for (int q = 0; q < 4; q++) {
     vec2 o = vec2(q == 1 || q == 2 ? 0.0 : -1.0, q >= 2 ? 0.0 : -1.0);
     vec3 m = vec3(0.0), s = vec3(0.0);
     for (int j = 0; j <= 1; j++) for (int i = 0; i <= 1; i++) {
-      vec3 c = sqrt(max(texture2D(tDiffuse, vUv + (o + vec2(float(i), float(j))) * texel).rgb, 0.0)); m += c; s += c * c;
+      vec3 c = sqrt(max(textureLod(tDiffuse, vUv + (o + vec2(float(i), float(j))) * texel, 0.0).rgb, 0.0)); m += c; s += c * c;
     }
     m *= 0.25; s = abs(s * 0.25 - m * m);
     float v = s.r + s.g + s.b;
@@ -34,28 +37,34 @@ vec3 fineKnife() {
 
 void main() {
   // The broad knife smears a fixed number of pixels, so it eats the detail of anything small on screen, which is
-  // to say anything far away. With "sharp" on, it gives way to the fine knife between about 40 and 130 units off.
-  float far = 0.0;
+  // to say anything that is not close. With "sharp" on, the knife is a fixed size in the world instead: at its full
+  // width out to REACH units from the camera, and narrower in proportion beyond that (half as wide at twice the
+  // distance), so a tree keeps the same number of strokes however far off it stands. Once the knife is down to a
+  // pixel or so, the fine knife takes over.
+  float far = 0.0, k = 1.0;
   if (sharp > 0.5) {
-    float z = texture2D(tDepth, vUv).r * 2.0 - 1.0;
+    float z = textureLod(tDepth, vUv, 0.0).r * 2.0 - 1.0;
     float dist = 2.0 * clip.x * clip.y / (clip.y + clip.x - z * (clip.y - clip.x));
-    far = smoothstep(38.0, 130.0, dist);
+    float least = 1.3 / float(RADIUS), ratio = REACH / max(dist, 0.01);
+    k = clamp(ratio, least, 1.0);
+    far = smoothstep(least * 1.7, least, ratio);
   }
+  vec2 tex = texel * k;
   vec3 fine = far > 0.001 ? fineKnife() : vec3(0.0);
   if (far > 0.999) { gl_FragColor = vec4(fine, 1.0); return; }
   vec3 m0 = vec3(0.0), m1 = vec3(0.0), m2 = vec3(0.0), m3 = vec3(0.0);
   vec3 s0 = vec3(0.0), s1 = vec3(0.0), s2 = vec3(0.0), s3 = vec3(0.0);
   for (int j = -RADIUS; j <= 0; j++) for (int i = -RADIUS; i <= 0; i++) {
-    vec3 c = sqrt(max(texture2D(tDiffuse, vUv + vec2(float(i), float(j)) * texel).rgb, 0.0)); m0 += c; s0 += c * c;
+    vec3 c = sqrt(max(textureLod(tDiffuse, vUv + vec2(float(i), float(j)) * tex, 0.0).rgb, 0.0)); m0 += c; s0 += c * c;
   }
   for (int j = -RADIUS; j <= 0; j++) for (int i = 0; i <= RADIUS; i++) {
-    vec3 c = sqrt(max(texture2D(tDiffuse, vUv + vec2(float(i), float(j)) * texel).rgb, 0.0)); m1 += c; s1 += c * c;
+    vec3 c = sqrt(max(textureLod(tDiffuse, vUv + vec2(float(i), float(j)) * tex, 0.0).rgb, 0.0)); m1 += c; s1 += c * c;
   }
   for (int j = 0; j <= RADIUS; j++) for (int i = 0; i <= RADIUS; i++) {
-    vec3 c = sqrt(max(texture2D(tDiffuse, vUv + vec2(float(i), float(j)) * texel).rgb, 0.0)); m2 += c; s2 += c * c;
+    vec3 c = sqrt(max(textureLod(tDiffuse, vUv + vec2(float(i), float(j)) * tex, 0.0).rgb, 0.0)); m2 += c; s2 += c * c;
   }
   for (int j = 0; j <= RADIUS; j++) for (int i = -RADIUS; i <= 0; i++) {
-    vec3 c = sqrt(max(texture2D(tDiffuse, vUv + vec2(float(i), float(j)) * texel).rgb, 0.0)); m3 += c; s3 += c * c;
+    vec3 c = sqrt(max(textureLod(tDiffuse, vUv + vec2(float(i), float(j)) * tex, 0.0).rgb, 0.0)); m3 += c; s3 += c * c;
   }
   float n = float((RADIUS + 1) * (RADIUS + 1));
   vec3 best = m0 / n; s0 = abs(s0 / n - best * best);
@@ -145,7 +154,7 @@ export class Painterly {
     this.flash = 0;
     this.sat = 1.22;
     this.bloom = 1;
-    this.sharp = 0;         // 1: far-off things keep their detail (the broad knife eases off with distance)
+    this.sharp = 0;         // 1: things keep their detail with distance (the knife narrows the further off it works)
     this.maxH = 1080;       // the picture is painted at no more than this many rows, then scaled to the window
     const rtOpts = { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true };
     // (the scene's depth is kept as a texture, so the knife can tell near from far)
