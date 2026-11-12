@@ -159,26 +159,34 @@ canvas.addEventListener('mousedown', (e) => {
   if (game.state === 'photo') { dragging = true; return; }
   if (game.state !== 'play') return;
   sound.start();
-  if (document.pointerLockElement !== canvas) { canvas.requestPointerLock?.()?.catch?.(() => {}); dragging = true; }
+  if (document.pointerLockElement !== canvas) { capture(); dragging = true; }
   if (e.button === 0) { pressed.add('Attack'); keys.add('Attack'); }     // held: keeps painting
   if (e.button === 2) pressed.add('NextPaint');
 });
 addEventListener('mouseup', (e) => { dragging = false; if (e.button === 0) keys.delete('Attack'); });
-// A captured mouse sometimes reports a single enormous movement out of nowhere: a known quirk of some browser and
-// mouse combinations, and common in the instant after the pointer is captured or the window regains focus. One such
-// event is enough to spin the view half-way round. So: nothing counts for a moment after capture or refocus, and a
-// movement that is both large and wildly out of line with the ones just before it is dropped. A genuine fast flick
-// builds up over a few events, or carries on in the same direction, so it gets through.
-const mouse = { pace: 0, at: 0, quietUntil: 0, dropAt: -1e9, dropSign: 0, dropped: 0 };
+// A captured mouse sometimes reports enormous movements out of nowhere, one or a few in a row: a known fault of
+// some browsers on Windows, where the hidden pointer being put back in the middle of the window is reported as if
+// the hand had moved it. Half a window's width is enough to spin the view right round. Three defences:
+//   - the mouse is captured raw where the browser allows it, which leaves the system pointer out of it altogether;
+//   - nothing counts for a moment after capture or refocus, and a movement that is large and wildly out of line
+//     with the ones before it is dropped. A real flick keeps coming the same way, so its third event is believed;
+//   - no single event may turn the view more than LOOK_CAP pixels' worth (about 35 degrees), whatever it claims.
+const LOOK_CAP = 240;
+function capture() {
+  const lock = canvas.requestPointerLock?.({ unadjustedMovement: true });
+  lock?.catch?.(() => canvas.requestPointerLock?.()?.catch?.(() => {}));       // (raw movement not on offer here: the ordinary kind)
+}
+const mouse = { pace: 0, at: 0, quietUntil: 0, runAt: -1e9, runSign: 0, run: 0, dropped: 0 };
 const settleMouse = () => { mouse.quietUntil = performance.now() + 150; mouse.pace = 0; };
 function plausible(e) {
   const now = performance.now();
   mouse.pace *= Math.exp(-(now - mouse.at) / 150); mouse.at = now;
   if (now < mouse.quietUntil) return false;
   const mag = Math.hypot(e.movementX, e.movementY), sign = Math.sign(e.movementX);
-  if (mag > 100 && mag > 6 * mouse.pace + 80 && !(now - mouse.dropAt < 80 && sign === mouse.dropSign)) {
-    mouse.dropAt = now; mouse.dropSign = sign; mouse.dropped++;
-    return false;
+  if (mag > 100 && mag > 4 * mouse.pace + 80) {
+    mouse.run = now - mouse.runAt < 80 && sign === mouse.runSign ? mouse.run + 1 : 1;
+    mouse.runAt = now; mouse.runSign = sign;
+    if (mouse.run < 3) { mouse.dropped++; return false; }
   }
   mouse.pace += (mag - mouse.pace) * 0.5;
   return true;
@@ -187,19 +195,20 @@ document.addEventListener('pointerlockchange', settleMouse);
 addEventListener('focus', settleMouse);
 addEventListener('mousemove', (e) => {
   if ((game.state === 'photo' || game.state === 'play') && !plausible(e)) return;
+  const mx = clamp(e.movementX, -LOOK_CAP, LOOK_CAP), my = clamp(e.movementY, -LOOK_CAP, LOOK_CAP);
   if (game.state === 'photo') {
     if (document.pointerLockElement === canvas || dragging) {
       const look = settings.values.look;
-      photo.yaw -= e.movementX * 0.0026 * look;
-      photo.pitch = clamp(photo.pitch + e.movementY * 0.0022 * look * (settings.values.invert ? -1 : 1), -1.25, 1.4);
+      photo.yaw -= mx * 0.0026 * look;
+      photo.pitch = clamp(photo.pitch + my * 0.0022 * look * (settings.values.invert ? -1 : 1), -1.25, 1.4);
     }
     return;
   }
   if (game.state !== 'play') return;
   if (document.pointerLockElement === canvas || dragging) {
     const look = settings.values.look;
-    game.yaw -= e.movementX * 0.0026 * look;
-    game.pitch = clamp(game.pitch + e.movementY * 0.0022 * look * (settings.values.invert ? -1 : 1), -0.45, 1.15);
+    game.yaw -= mx * 0.0026 * look;
+    game.pitch = clamp(game.pitch + my * 0.0022 * look * (settings.values.invert ? -1 : 1), -0.45, 1.15);
     game.lookIdle = 0;
   }
 });
@@ -216,7 +225,7 @@ function begin() {
   game.pitch = 0.16; game.lookIdle = 0;
   document.activeElement?.blur?.();
   sound.start();
-  canvas.requestPointerLock?.()?.catch?.(() => {});
+  capture();
   if (new URLSearchParams(location.search).has('underpainting') && !under.contains(player.pos)) { enterUnder(); return; }
   if (new URLSearchParams(location.search).has('gallery') && !gallery.contains(player.pos)) { galleryAct({ type: 'door', door: gallery.doors[0] }); return; }
   const here = game.resumed ? world.islandAt(player.pos.x, player.pos.z) : null;
@@ -305,7 +314,7 @@ function openGallery(final) {
 document.getElementById('wander').addEventListener('click', () => {
   document.getElementById('ending').classList.add('hidden');
   game.state = 'play'; hud.show(true);
-  canvas.requestPointerLock?.()?.catch?.(() => {});
+  capture();
   if (game.won) hint('door', 'The door of the Spire stands open now.', 8000);
   if (game.won) setTimeout(() => hint('photo', 'Press C to stop the world and take a picture of it.', 7000), 9000);
 });
@@ -341,7 +350,7 @@ function closeMenu() {
   document.activeElement?.blur?.();
   if (from === 'title') { $id('title').classList.remove('hidden'); return; }
   game.state = 'play'; game.lookIdle = 0; hud.show(true);
-  canvas.requestPointerLock?.()?.catch?.(() => {});
+  capture();
   // closing with Esc cannot take the mouse back by itself, so say how
   setTimeout(() => {
     if (game.state === 'play' && document.pointerLockElement !== canvas) { game.unlocked = true; hud.hint('Click to look around again', 7000); }
