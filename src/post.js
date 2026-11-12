@@ -111,11 +111,11 @@ void main() {
 export class Painterly {
   constructor(renderer) {
     this.renderer = renderer;
-    this.mode = 1; // 0 off, 1 painterly, 2 heavy impasto
+    this.mode = 2; // 0 off, 1 painterly, 2 heavy impasto (the settings decide; this is only what it starts as)
     this.flash = 0;
     this.sat = 1.22;
     this.bloom = 1;
-    this.maxH = 760;        // the picture is painted at no more than this many rows, then scaled to the window
+    this.maxH = 1080;       // the picture is painted at no more than this many rows, then scaled to the window
     const rtOpts = { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true };
     this.rtScene = new THREE.WebGLRenderTarget(4, 4, rtOpts);
     this.rtK = new THREE.WebGLRenderTarget(4, 4, { ...rtOpts, depthBuffer: false });
