@@ -20,6 +20,7 @@ import { Underpainting } from './underpainting.js';
 import { Seedbed } from './seedbed.js';
 import { LastPage } from './lastpage.js';
 import { Gallery } from './gallery.js';
+import { setupTouch } from './touch.js';
 import { clamp, lerp, glowTexture } from './util.js';
 
 const V3 = THREE.Vector3;
@@ -212,6 +213,14 @@ addEventListener('mousemove', (e) => {
     game.lookIdle = 0;
   }
 });
+// fingers: the same keys, and the same looking about (a little quicker, since a thumb travels less far than a mouse)
+const touch = setupTouch(canvas, keys, pressed, (dx, dy) => {
+  if (game.state !== 'play') return;
+  const look = settings.values.look;
+  game.yaw -= dx * 0.0062 * look;
+  game.pitch = clamp(game.pitch + dy * 0.005 * look * (settings.values.invert ? -1 : 1), -0.45, 1.15);
+  game.lookIdle = 0;
+});
 addEventListener('wheel', (e) => {
   if (game.state === 'photo') photo.dist = clamp(photo.dist * (1 + Math.sign(e.deltaY) * 0.12), 1.2, 70);
   else game.dist = clamp(game.dist + Math.sign(e.deltaY) * 0.6, 4.5, 14);
@@ -353,7 +362,7 @@ function closeMenu() {
   capture();
   // closing with Esc cannot take the mouse back by itself, so say how
   setTimeout(() => {
-    if (game.state === 'play' && document.pointerLockElement !== canvas) { game.unlocked = true; hud.hint('Click to look around again', 7000); }
+    if (game.state === 'play' && document.pointerLockElement !== canvas && !touch.on) { game.unlocked = true; hud.hint('Click to look around again', 7000); }
   }, 600);
 }
 $id('openSettings').addEventListener('click', openMenu);
@@ -1203,11 +1212,12 @@ function updatePlay(dt, t) {
   }
 
   // gentle teaching, one line at a time
-  if (game.playT > 4) hint('move', 'Walk with W A S D &nbsp;·&nbsp; look around with the mouse');
-  if (game.playT > 13) hint('paint', 'Click to paint the world around you &nbsp;·&nbsp; Q changes colour');
-  if (game.playT > 24) hint('skate', 'Hold Shift to skate across the paint');
-  if (game.playT > 35) hint('glide', 'Space to jump &nbsp;·&nbsp; hold it in the air to glide');
-  if (game.playT > 50) hint('map', 'Press H if you ever want the map &nbsp;·&nbsp; Esc for settings');
+  const T = touch.on;          // (the same lessons, in whichever words fit the hands that are playing)
+  if (game.playT > 4) hint('move', T ? 'Left thumb to walk &nbsp;·&nbsp; right thumb to look around' : 'Walk with W A S D &nbsp;·&nbsp; look around with the mouse');
+  if (game.playT > 13) hint('paint', T ? 'Hold Paint to paint the world around you &nbsp;·&nbsp; Q changes colour' : 'Click to paint the world around you &nbsp;·&nbsp; Q changes colour');
+  if (game.playT > 24) hint('skate', T ? 'Hold Skate to skate across the paint' : 'Hold Shift to skate across the paint');
+  if (game.playT > 35) hint('glide', T ? 'Jump &nbsp;·&nbsp; keep it held in the air to glide' : 'Space to jump &nbsp;·&nbsp; hold it in the air to glide');
+  if (game.playT > 50) hint('map', T ? 'The button at the top opens the settings' : 'Press H if you ever want the map &nbsp;·&nbsp; Esc for settings');
 
   // island name cards
   if (player.grounded && player.lastIsland !== game.shownIsland && player.lastIsland !== undefined) {
@@ -1325,6 +1335,7 @@ function tick(dt) {
   game.dawn = game.dawn === undefined ? dawn : game.dawn + (dawn - game.dawn) * (1 - Math.exp(-0.5 * dt));
   gallery.found = !!game.hints.hung;
   gallery.total = Math.max(1, spare().length);
+  touch.show(game.state === 'play' && !game.menu && !gallery.ending);
   gallery.eye.copy(camera.position);
   gallery.indoors = game.state === 'play' && interior.inside(player.pos);
   gallery.outdoors = game.state === 'play' && !gallery.contains(player.pos) && !under.contains(player.pos) && !interior.inside(player.pos);

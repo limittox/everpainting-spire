@@ -28,6 +28,8 @@ There is no combat and nothing to fail. If you fall, the paint carries you back.
 | `P` | Cycle the brushwork filter |
 | `Esc` | Settings |
 
+On a phone or tablet: the left thumb walks (a stick appears wherever it comes down), the right thumb looks around, and on-screen buttons paint, jump and glide, skate, use (`E`), change paint (`Q`) and open the settings. The sketchbook, photo mode and the map are keyboard-only for now.
+
 ## What there is to do
 
 - **Paint.** Every swing lays real strokes into the ground and soaks colour into trees, rocks and walls. Flowers come up where you walk.
