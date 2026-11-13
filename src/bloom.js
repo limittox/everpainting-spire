@@ -304,6 +304,15 @@ export class Garden {
   }
 
   /** Advance every animation; with a `player`, also wake what they have come close to. Returns this frame's events. */
+  /** Afterwards: open flowers close and sink where the painter passes. */
+  wilt(pos, radius) {
+    for (const b of this.buds) {
+      if (!b.awake || b.t < 1 || b.wilted || (b.x - pos.x) ** 2 + (b.z - pos.z) ** 2 > radius * radius || Math.abs(b.y - pos.y) > 4) continue;
+      b.wilted = true;
+      this.bigPool.place(b.flower, 0.6, 0.16);
+    }
+  }
+
   update(dt, t, player) {
     const ev = this.events; ev.length = 0;
 

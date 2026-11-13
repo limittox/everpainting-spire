@@ -366,7 +366,7 @@ for (const id of ['startOver', 'titleOver']) {
     if (btn.dataset.armed) { store.clear(); location.reload(); return; }
     btn.dataset.armed = '1'; btn.textContent = 'Wash it all away? Click again';
     clearTimeout(timer);
-    timer = setTimeout(() => { delete btn.dataset.armed; btn.textContent = label; }, 4500);
+    timer = setTimeout(() => { delete btn.dataset.armed; btn.textContent = btn.dataset.label || label; }, 4500);
   });
 }
 
@@ -595,7 +595,7 @@ function updateCamera(dt, snap = false) {
   const side = lerp(-5.5 * clamp((camera.aspect - 0.9) / 0.8, 0, 1), 0.95, k);   // title: the painter stands off to the right
   game.restBlend = clamp(game.restBlend + (game.rest ? dt / 3.8 : -dt / 1.7), 0, 1);
   const rk = game.restBlend * game.restBlend * (3 - 2 * game.restBlend);
-  const fov = 56 + game.flow * 9 - rk * (game.lastRest ? game.lastRest.fovDrop : 0);
+  const fov = 56 + game.flow * 9 - rk * (game.lastRest ? game.lastRest.fovDrop : 0) - (game.jolt || 0) * 13;
   if (Math.abs(fov - camera.fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
   const cy = Math.cos(view.pitch), sy = Math.sin(view.pitch);
   const rx = Math.cos(view.yaw), rz = -Math.sin(view.yaw);
@@ -1247,6 +1247,11 @@ function updateFinale(dt, t) {
       : 'The paint is still wet where you left it. Carry on from here, or wash the canvas clean and begin again.';
     $id('titleOver').hidden = false;
   }
+  // afterwards, the game itself is not quite the same (starting over still works, whatever it says)
+  if (gallery.ended) {
+    $id('begin').textContent = 'Come back';
+    for (const id of ['startOver', 'titleOver']) { const b = $id(id); b.dataset.label = b.textContent = 'It won\u2019t help'; }
+  }
   if (game.journey > 1) {
     $id('titleKicker').textContent = `A ${nth(game.journey)} wander`;
     if (!game.resumed) {
@@ -1300,6 +1305,8 @@ function tick(dt) {
   gallery.found = !!game.hints.hung;
   gallery.total = Math.max(1, spare().length);
   gallery.eye.copy(camera.position);
+  gallery.outdoors = game.state === 'play' && !gallery.contains(player.pos) && !under.contains(player.pos) && !interior.inside(player.pos);
+  game.jolt = Math.max(0, (game.jolt || 0) - dt * 2.4);
   camera.getWorldDirection(tmp); gallery.gaze.set(tmp.x, 0, tmp.z).normalize();
   sound.setThin(gallery.ended ? 3 : gallery.contains(player.pos) ? Math.min(3, gallery.lifts) : 0);
   gallery.update(dt, time, game.state === 'title' ? null : player, blots);
@@ -1309,7 +1316,10 @@ function tick(dt) {
       const vol = 0.03 + 0.15 * ev.near;
       if (ev.late) setTimeout(() => sound.tread(vol), 230); else sound.tread(vol);
       hint('moves', 'It moves when you cannot see it.', 8000);
-    } else if (ev.type === 'note') { if (settings.values.music > 0) sound.jig(ev.i); }
+    } else if (ev.type === 'beat') sound.beat(0.07 + 0.3 * ev.near);
+    else if (ev.type === 'scare') { sound.sting(); game.jolt = 1; }          // once only: it is right there
+    else if (ev.type === 'dirge') { if (settings.values.music > 0) sound.jig(ev.i, true); }
+    else if (ev.type === 'note') { if (settings.values.music > 0) sound.jig(ev.i); }
     else if (ev.type === 'join') {
       // the companions have found somebody to dance with, and they are staying
       fx.burst(tmp.copy(ev.at).setY(ev.at.y + 1.6), 50, { speed: 5, up: 7, colors: ['#ffd060', '#ff8ab0', '#8fdcff', '#fff6e2'], size: 0.4, life: 1.4, gravity: 5 });
@@ -1336,7 +1346,8 @@ function tick(dt) {
     }
   }
   const hung = gallery.look(camera.position), grey = !!hung && hung.name === 'grey';
-  sound.hush(grey ? 0 : gallery.ended ? 0.3 : 1);
+  sound.hush(grey ? 0 : gallery.ended ? 0.9 : 1);
+  sound.setDark(gallery.ended);
   sound.breath(grey ? gallery.close : 0);
   if (!gallery.dark && game.wasDark) { game.wasDark = false; day.t = -1; }          // (the light comes back: have the day lay its own tint again)
   // the grey room has no colour until the other painter starts taking it from the painter
@@ -1355,11 +1366,13 @@ function tick(dt) {
   for (const s of sparks) if (!s.taken) s.update(time, dt);
   drops.update(time);
   swings.update(dt);
-  for (const ev of garden.update(dt, time, game.state === 'play' ? player : null)) bloomEvent(ev);
+  for (const ev of garden.update(dt, time, game.state === 'play' && !gallery.ended ? player : null)) bloomEvent(ev);
+  if (gallery.ended && game.state === 'play') garden.wilt(player.pos, 6);
   painter.update(dt);
   vistas.update(time);
   secrets.update(time);
   interior.update(time);
+  interior.deface(gallery.ended);
   for (const ev of seedbed.update(dt, time, game.state === 'title' ? null : player)) {
     if (ev.type === 'fleck') fx.emit(tmp.set(ev.x, ev.y, ev.z), 0, ev.fast ? 6 : 3.4, 0, Math.random() < 0.5 ? '#ffc070' : '#ffe6b0', 0.2, ev.fast ? 2.4 : 1.9, 0, 1.4);
     else if (ev.type === 'grown') { sound.play('vista'); hud.toast('The vine has grown', 'A way where there was none', 3600); cheerAll(); saveSoon(); }

@@ -37,6 +37,11 @@ import { ghostMaterial } from './sketches.js';
 // And the companions. A piper lives in High Summer, and is glad of company: the companions go to the piper, dance,
 // and do not come away again. That is the happiest place in the game. Afterwards it is where they are found.
 //
+// And it does not stop at the portrait. One of the companions is not quite dead, and tries to come to the painter.
+// The piper's tune is still in the clearing, running down. There is blood across the gallery floor, to the way
+// home. The portrait is different every time it is come back to. The muse weeps. Somebody in the painter's colours
+// is seen, far off, in the first painting, and is never there on arrival.
+//
 // It does not come from nowhere. Each time something is lifted the music loses a layer; the dust sheet over that
 // picture hangs a little lower every time the painter comes back into the room; and the game counts the lifts.
 // (It all lives far to the east of everything else, in the same scene.)
@@ -112,10 +117,10 @@ function partsOf(roots, skip = []) {
 /** Leave `n` of those parts as a drawing (from the feet up, or from the head down) and the rest as they were painted. */
 const dress = (parts, ghost, n, fromFeet) => parts.forEach((m, i) => { m.material = (fromFeet ? i < n : i >= parts.length - n) ? ghost : m.userData.real; });
 /** A picture with somebody in it who was not there before. */
-function haunted(tex) {
+function haunted(tex, s = 1.2, v = 282) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 320;
   const x = c.getContext('2d');
-  x.drawImage(tex.image, 0, 0); figure(x, 128, 282, 1.2, '#f6f4ee');
+  x.drawImage(tex.image, 0, 0); figure(x, 128, v, s, '#f6f4ee');
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -201,7 +206,11 @@ void main() {
 export class Gallery {
   /** `atelier` is the middle of the Spire's hall: once the gallery has been found, a frame stands there that leads back to it. */
   constructor(scene, world, uTime, lastpage, atelier) {
-    this.scene = scene; this.lastpage = lastpage; this.found = false;
+    this.scene = scene; this.world = world; this.lastpage = lastpage; this.found = false;
+    this.after = 0;                                         // how often the gallery has been come back to since the portrait
+    this.outdoors = false; this.sightT = 12;                // (the game says) out in the first painting; and how long until somebody is seen there
+    this.beatT = 0; this.holdT = 0; this.scared = false; this.crawled = false;
+    const rb = mulberry32(9133);                            // (for what was added later, so that nothing laid out before it moves)
     this.slipped = false; this.grey = false; this.hung = [];
     this.ghost = ghostMaterial(uTime);
     this.shade = new THREE.MeshBasicMaterial({ color: 0x14121a, fog: false });       // the other painter, where it has not been painted yet: a dark shape
@@ -273,7 +282,7 @@ export class Gallery {
       const floodFloor = (x, z) => surfY(FLOOD, x, z) + hill(Math.hypot(x - FLOOD.x, z - FLOOD.z));
       const pair = (a, isl, tex, toast, inAt, floor) => {
         const at = hp(a, 15.5);
-        this.hung.push({ at, pic: stand(lit(frame(W, H, tex), H), at, centre(HALL)).userData.pic, tex, grey: haunted(tex) });
+        this.hung.push({ at, pic: stand(lit(frame(W, H, tex), H), at, centre(HALL)).userData.pic, tex, greys: [haunted(tex), haunted(tex, 2.3, 336), haunted(tex, 4.6, 492)], stage: 0, seen: false });
         stand(lit(frame(W, H, pic.hall), H), inAt, centre(isl));
         this.doors.push({ at, text: 'Step into the picture', to: arrive(inAt, centre(isl), isl, floor), toast });
         this.doors.push({ at: inAt, text: 'Step back out of the picture', to: arrive(at, centre(HALL), hall, flat(HALL)), toast: ['The Gallery', ''], out: true });
@@ -308,10 +317,38 @@ export class Gallery {
       {
         // what will hang in it: a portrait in pencil. Until then, bare boards
         const paper = ['#ebe5da', '#e2dccf', '#f8f4ec', '#d8d2c6'];
-        const g = stand(frame(6.4, 7.6, picture('#f1ece2', paper, 95, (x) => figure(x, 128, 298, 3.3, '#4a4854', 4))), this.empty, centre(HALL));
+        const scrawl = (x, r) => { x.strokeStyle = '#2a2830'; x.lineWidth = 5; x.lineCap = 'round'; for (let i = 0; i < 30; i++) { x.beginPath(); x.moveTo(16 + r() * 224, 16 + r() * 288); x.lineTo(16 + r() * 224, 16 + r() * 288); x.stroke(); } };
+        this.portraits = [
+          picture('#f1ece2', paper, 95, (x) => figure(x, 128, 298, 3.3, '#4a4854', 4)),
+          picture('#f1ece2', paper, 95, (x) => figure(x, 92, 306, 3.9, '#4a4854', 4)),                               // it has moved
+          picture('#f1ece2', paper, 95, (x) => figure(x, 128, 530, 7.4, '#3a3844', 5)),                              // it is nearer
+          picture('#f1ece2', paper, 95, (x, r) => { figure(x, 128, 530, 7.4, '#3a3844', 5); scrawl(x, r); }),        // it has been scratched out
+        ];
+        const g = stand(frame(6.4, 7.6, this.portraits[0]), this.empty, centre(HALL));
         this.framePic = g.userData.pic; this.framePic.visible = false;
         this.frameGlow = glowSprite(world.glowTex, 13, 0xffffff, 0); this.frameGlow.position.set(0, 4.3, 1); g.add(this.frameGlow);
         this.doors.push({ at: this.empty, text: 'Step into the frame', to: arrive(this.empty, centre(HALL), hall, flat(HALL)), frame: true, open: () => this.whole && this.wholeT > 3.5 && !this.ended });
+      }
+      // afterwards: drops of red across the floor, from High Summer's frame to the way home
+      {
+        const from = this.hung[1].at, to = this.backAt, blood = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.0, 0.012), fog: false, side: THREE.DoubleSide });
+        this.trail = new THREE.Group();
+        for (let i = 0; i < 24; i++) {
+          const f = (i + 0.5) / 24, x = from.x + (to.x - from.x) * f + (rb() - 0.5) * 1.1, z = from.z + (to.z - from.z) * f + (rb() - 0.5) * 1.1;
+          const m = new THREE.Mesh(new THREE.CircleGeometry(i % 6 === 0 ? 0.48 : 0.1 + rb() * 0.2, 12).rotateX(-Math.PI / 2), blood);
+          m.position.set(x, surfY(HALL, x, z) + 0.05, z); m.scale.z = 0.6 + rb() * 0.8; m.rotation.y = rb() * 3;
+          this.trail.add(m);
+        }
+        this.trail.visible = false;
+        scene.add(this.trail);
+        // and in the first painting, the muse weeps
+        this.tears = [1, -1].map((side) => {
+          const m = new THREE.Mesh(new THREE.PlaneGeometry(0.007, 0.17), blood);
+          m.add(new THREE.Mesh(new THREE.CircleGeometry(0.0075, 12).translate(0, -0.088, 0), blood));          // (the drop it ends in)
+          m.position.set(0.166, 0.56, side * 0.3125); m.visible = false;
+          world.muse.add(m);
+          return m;
+        });
       }
       // the other painter stands in front of the way home
       {
@@ -443,6 +480,13 @@ export class Gallery {
           scene.add(pool);
           return { pos: new V3(x, y, z), pool, turn: i * 1.9 };
         });
+        S.hat = new THREE.Group();
+        const crown = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.5, 10), flat(0xe8c46a)); crown.position.y = 0.26;
+        S.hat.add(new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.86, 0.07, 14), flat(0xe8c46a)), crown);
+        S.hat.position.set(npcAt.x + 0.8, npcAt.y + 0.22, npcAt.z - 0.6); S.hat.rotation.set(0.5, 0.3, 0.35); S.hat.visible = false;
+        scene.add(S.hat);
+        S.smear = Array.from({ length: 18 }, () => { const m = new THREE.Mesh(new THREE.CircleGeometry(0.2, 10).rotateX(-Math.PI / 2), blood); m.visible = false; scene.add(m); return m; });
+        S.crawl = { b: null, state: 'still', gone: 0, laid: 0 };
       }
 
       // wheat: the south field drinks from the stream, the north field from the pond
@@ -548,7 +592,8 @@ export class Gallery {
       if (this.hung.some((h) => h.at.distanceTo(p) < 6)) return { key: 'someone', line: 'There is someone in it.' };
       return null;
     }
-    if (w === 'hall' && this.ended) return this.empty.distanceTo(p) < 7 ? { key: 'portrait', line: 'A portrait of a painter, in pencil. It was never finished.' } : null;
+    if (w === 'hall' && this.ended) return this.empty.distanceTo(p) < 7 ? { key: 'portrait', line: 'A portrait of a painter, in pencil. It was never finished.' } : { key: 'colours', line: 'Thank you for the colours.' };
+    if (w === 'summer' && this.ended) return p.distanceTo(this.summer.npcAt) < 10 ? { key: 'danced', line: 'They danced for a long time.' } : null;
     if (w === 'hall') {
       if (this.slipped && this.odd.at.distanceTo(p) < 7) return { key: 'odd', line: 'A painting of this room. Whoever is in it is standing where you are.' };
       if (this.draped.some((q) => q.distanceTo(p) < 4.6)) return { key: 'draped', line: 'Still under its dust sheet. It has not been hung yet.' };
@@ -563,14 +608,15 @@ export class Gallery {
     return null;
   }
 
-  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, joined: this.joined ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
+  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, joined: this.joined ? 1 : 0, after: Math.min(this.after, 9), crawled: this.crawled ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
   load(d) {
     if (!d) return;
     this.slipped = !!d.slipped; this.ended = this.slipped && !!d.ended; this.grey = this.slipped && !!d.grey && !this.ended;
     this.taken = Number.isInteger(d.taken) && d.taken > 0 && this.slipped ? Math.min(d.taken, PAINTS.length) : 0;
     this.whole = this.ended || (this.slipped && !!d.whole);
     if (this.whole) this.wholeT = 99;
-    this.joined = !!d.joined;
+    this.joined = !!d.joined; this.crawled = !!d.crawled;
+    this.after = Number.isInteger(d.after) && d.after > 0 && this.ended ? d.after : 0;
     this.lifts = Number.isInteger(d.lifts) && d.lifts > 0 ? d.lifts : 0; this.visits = Number.isInteger(d.visits) && d.visits > 0 ? d.visits : 0;
     const F = this.flood, S = this.summer, level = [0, 1, 2].includes(d.level) ? d.level : 2, wet = S.spots.map((_, i) => !!(d.wet && d.wet[i]));
     const held = 2 - level - wet.filter(Boolean).length;          // there are two brushfuls in all: any that is nowhere is on the brush
@@ -589,7 +635,7 @@ export class Gallery {
     O.on.visible = !this.slipped; O.off.visible = this.slipped;
     // every time the room is come back to, the sheet hangs a little lower and a little to one side
     if (inHall && !this._inHall) {
-      this.visits++;
+      this.visits++; if (this.ended) this.after++;
       const k = Math.min(3, this.visits - 1), side = k ? (this.visits % 2 ? 0.12 : -0.12) : 0;
       O.on.position.set(O.right.x * side, -0.18 * k, O.right.z * side);
     }
@@ -633,7 +679,8 @@ export class Gallery {
       } else if (this.greyT <= 5) T.root.visible = false;
       else if (this.away > 0) {
         // it has just taken something: nowhere at all for a while, and then behind the painter
-        this.away -= dt; T.root.visible = false;
+        this.holdT -= dt; T.root.visible = this.holdT > 0;          // (the first time, it stays a moment where it touched)
+        if (this.holdT <= 0) this.away -= dt;
         if (this.away <= 0) {
           // (behind and to one side of the view, so that it comes in at the edge of the picture and not through the camera)
           // whichever side has more room (near a wall, one side has none)
@@ -666,11 +713,31 @@ export class Gallery {
           if (!dark) { this.moved = true; this.stepT -= dt; if (this.stepT <= 0) { this.stepT = 0.36; ev.push({ type: 'tread', near }); } }
         } else if (this.moved && seen) { this.moved = false; ev.push({ type: 'tread', near, late: true }); }      // caught moving: one more step lands, a beat late
         this.close = clamp(1 - (d - 2) / 7, 0, 1);
+        this.beatT -= dt;
+        if (this.beatT <= 0 && this.close > 0.04) { this.beatT = 1.15 - 0.75 * this.close; ev.push({ type: 'beat', near: this.close }); }
         if (d < 1.7) {
           // it has reached the painter: one paint (two, once it has a few), and it is gone
           const n = Math.min(this.total - this.taken, this.taken >= 2 ? 2 : 1);
           for (let i = 0; i < n; i++) { this.taken++; ev.push({ type: 'take', n: this.taken, last: this.taken >= this.total, at, touch: i === 0 }); }
-          if (this.taken >= this.total) { this.whole = true; this.wholeT = 0; } else { this.away = 2.5 + Math.random() * 2; T.root.visible = false; this.moved = false; }
+          if (this.taken >= this.total) { this.whole = true; this.wholeT = 0; } else {
+            this.away = 2.5 + Math.random() * 2; this.moved = false;
+            this.holdT = this.scared ? 0 : 0.8;
+            if (!this.scared) { this.scared = true; ev.push({ type: 'scare', at }); }
+            T.root.visible = this.holdT > 0;
+          }
+        }
+      }
+    } else if (this.ended && this.outdoors && player) {
+      // somebody in the painter's colours, a long way off, with their back turned. Never there on arrival
+      const p = player.pos, at = T.at, d = T.root.visible ? Math.hypot(p.x - at.x, p.z - at.z) : 0;
+      this.sightT -= dt;
+      if (T.root.visible && (d < 26 || d > 120)) { T.root.visible = false; this.sightT = 16 + Math.random() * 20; }
+      else if (!T.root.visible && this.sightT <= 0) {
+        this.sightT = 5;
+        for (const far of [54, 44, 64, 36]) {
+          const a = (Math.random() - 0.5) * 0.9, c = Math.cos(a), s = Math.sin(a), g = this.gaze;
+          const x = p.x + (g.x * c - g.z * s) * far, z = p.z + (g.x * s + g.z * c) * far, y = this.world.groundHeight(x, z, 1e9);
+          if (y > -Infinity && Math.abs(y - p.y) < 40) { at.set(x, y, z); T.root.position.copy(at); T.root.rotation.y = Math.atan2(x - p.x, z - p.z); T.root.visible = true; break; }
         }
       }
     } else T.root.visible = false;
@@ -678,15 +745,25 @@ export class Gallery {
     const f = this.whole ? 1 : Math.min(1, this.taken / this.total), kT = Math.round((1 - f) * T.parts.length);
     if (kT !== T.k) { T.k = kT; dress(T.parts, this.shade, kT, false); }
 
-    this.framePic.visible = this.ended;
+    this.framePic.visible = this.ended; this.framePic.material.map = this.portraits[Math.min(3, this.after)];
     this.frameGlow.material.opacity += ((this.whole && this.wholeT > 3.5 && !this.ended ? 0.55 : 0) - this.frameGlow.material.opacity) * ease(1.5);
     if (this.ending) this.ending.t += dt;
     const gone = this.grey && inHall;
-    for (const h of this.hung) h.pic.material.map = gone ? h.grey : h.tex;
+    for (const h of this.hung) {
+      // in the grey room, whoever is in a picture is nearer the glass each time the painter looks away from it
+      if (gone) {
+        const ex = h.at.x - this.eye.x, ez = h.at.z - this.eye.z, el = Math.hypot(ex, ez) || 1, seen = (ex * this.gaze.x + ez * this.gaze.z) / el > 0.72;
+        if (h.seen && !seen) h.stage = Math.min(2, h.stage + 1);
+        h.seen = seen;
+      } else { h.stage = 0; h.seen = false; }
+      h.pic.material.map = gone ? h.greys[h.stage] : h.tex;
+    }
+    this.trail.visible = this.ended;
+    for (const m of this.tears) m.visible = this.ended;
     // High Summer: the piper plays, and the companions go to the piper and stay. Afterwards, this is where they are
     {
       const P = S.piper, here = !!player && this.where(player.pos) === 'summer', dist = player ? player.pos.distanceTo(S.npcAt) : 99;
-      P.visible = !this.ended;
+      P.visible = !this.ended; S.hat.visible = this.ended;
       if (!this.ended) {
         // a little dance: a bob, a sway, a turn toward whoever has come
         P.position.y = S.npcAt.y + Math.abs(Math.sin(t * 5.2)) * 0.22;
@@ -709,6 +786,8 @@ export class Gallery {
             // nobody is dancing now
             if (!b.dead) {
               b.dead = true; b.host = null; b.g.visible = true;
+              b.g.scale.setScalar(0.5);                                    // (the size they always were)
+              if (n === 1 && !this.crawled) S.crawl.b = b;
               b.g.position.copy(spot.pos); b.g.rotation.set(0, spot.turn, 1.42);
               b.body.scale.set(1.12, 0.62, 1.12); b.eyes.forEach((e) => e.scale.set(1.2, 0.1, 1));
               spot.pool.visible = true;
@@ -716,6 +795,25 @@ export class Gallery {
           } else if (this.joined) {
             if (!b.host) { b.host = S.lead; b.g.visible = true; if (b.g.position.distanceTo(S.npcAt) > 40) b.g.position.set(spot.pos.x, spot.pos.y + 1, spot.pos.z); }
             if (here && Math.random() < dt * 0.7) b.hop(0, Math.random() < 0.25);
+          }
+        }
+      }
+    }
+    if (this.ended && player && this.where(player.pos) === 'summer') {
+      const dist = player.pos.distanceTo(S.npcAt), C = S.crawl, b = C.b;
+      // the tune is still here, running down, until the painter is close enough to see why
+      if (dist > 6.5 && dist < 26) { S.noteT -= dt; if (S.noteT <= 0) { S.noteT = 0.5 + Math.random() * 0.4; ev.push({ type: 'dirge', i: S.note++ }); } }
+      // one of them is not quite dead. It tries to come to the painter, and does not get there
+      if (b && C.state !== 'done') {
+        const q = b.g.position, dx = player.pos.x - q.x, dz = player.pos.z - q.z, d = Math.hypot(dx, dz) || 1;
+        if (C.state === 'still' && d < 7.5) { C.state = 'crawl'; b.eyes.forEach((e) => e.scale.set(1.2, 0.45, 1)); }
+        if (C.state === 'crawl') {
+          if (C.gone > 3.6 || d < 2.3) { C.state = 'done'; this.crawled = true; b.eyes.forEach((e) => e.scale.set(1.2, 0.1, 1)); }
+          else {
+            const step = 0.42 * dt * (0.55 + 0.45 * Math.sin(t * 2.2));          // in pulls
+            q.x += (dx / d) * step; q.z += (dz / d) * step; q.y = surfY(SUMMER, q.x, q.z); C.gone += step;
+            b.g.rotation.z = 1.42 + Math.sin(t * 2.2) * 0.07;
+            if (C.gone > C.laid * 0.2 && C.laid < S.smear.length) { const m = S.smear[C.laid++]; m.position.set(q.x, q.y + 0.05, q.z); m.scale.setScalar(0.8 + Math.random() * 0.8); m.visible = true; }
           }
         }
       }

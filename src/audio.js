@@ -5,6 +5,9 @@
 
 const CHORDS = [[146.83, 220, 369.99, 329.63], [123.47, 185, 293.66, 440], [98, 146.83, 246.94, 369.99], [110, 164.81, 277.18, 369.99]];
 const PENT = [587.33, 659.25, 739.99, 880, 987.77, 1174.66, 1318.5];       // D major pentatonic, D5 upward
+// afterwards: the same slow chords gone wrong. Low, minor, each with a note that does not belong
+const DARK = [[73.42, 110, 174.61, 207.65], [69.3, 103.83, 164.81, 233.08], [65.41, 98, 155.56, 185], [73.42, 110, 155.56, 220]];
+const KNELL = [233.08, 277.18, 311.13, 369.99, 174.61];
 const STEP = 0.5;                                                          // an eighth note at 60 bpm; 16 steps to a chord
 const ARP = [0, 1, 2, 1, 3, 1, 2, 1];
 // the melody, one phrase per chord: [step, note of PENT, length in steps]
@@ -122,6 +125,12 @@ export class Sound {
     this.resting = on;
     if (this.ctx) this.applyLevel(1.5);
   }
+  /** Afterwards: the music is not the same music. */
+  setDark(on) {
+    if (on === !!this.dark) return;
+    this.dark = on;
+    if (this.ctx) this.applyLevel(3);
+  }
   /** Take layers away from the music, from the top down: 1 the melody, 2 the arpeggio as well, 3 the bass as well. */
   setThin(n) {
     if (n === (this.thin || 0)) return;
@@ -131,7 +140,7 @@ export class Sound {
   applyLevel(tc) {
     const now = this.ctx.currentTime, L = this.level, T = this.thin || 0;
     const set = (name, v) => this.bus[name].gain.setTargetAtTime(v, now, tc);
-    set('bass', L >= 1 && T < 3 ? 1 : 0); set('arp', L >= 2 && T < 2 ? (this.resting ? 0.45 : 1) : 0); set('song', (L >= 3 || this.resting) && T < 1 ? 1 : 0);
+    set('bass', this.dark || (L >= 1 && T < 3) ? 1 : 0); set('arp', L >= 2 && T < 2 ? (this.resting ? 0.45 : 1) : 0); set('song', (L >= 3 || this.resting) && T < 1 ? 1 : 0);
     set('pad', L >= 5 ? 1.25 : 1);
   }
 
@@ -144,7 +153,16 @@ export class Sound {
   }
 
   step(i, t) {
-    const s = i % 16, bar = Math.floor(i / 16), ci = bar % 4, c = CHORDS[ci], L = this.level;
+    const s = i % 16, bar = Math.floor(i / 16), ci = bar % 4, c = (this.dark ? DARK : CHORDS)[ci], L = this.level;
+    if (this.dark) {
+      // no tune, no companions: a drone that beats against itself, and now and then a bell a long way down
+      if (s === 0) {
+        for (const f of c) { this.tone('pad', 'sine', f, t, 0.085, 3.5, 8); this.tone('pad', 'sine', f, t, 0.05, 4, 8, 19); this.tone('pad', 'triangle', f, t, 0.022, 4, 8, -23); }
+        this.tone('bass', 'sine', c[0] / 2, t, 0.15, 2.5, 6.5);
+        for (let k = 0; k < 2; k++) if (Math.random() < 0.45) this.bell(KNELL[Math.floor(Math.random() * KNELL.length)] * (Math.random() < 0.3 ? 0.5 : 1), t + 1 + k * 3.4 + Math.random() * 2, 0.05, 4.5);
+      }
+      return;
+    }
     if (s === 0) {
       // the pad: every chord swells in over three seconds and out over the next chord
       for (const f of c) {
@@ -247,10 +265,24 @@ export class Sound {
   }
 
   /** One note of the piper's jig. */
-  jig(i) {
+  jig(i, wrong = false) {
     if (!this.ctx) return;
-    const scale = [587.33, 659.25, 739.99, 880, 987.77, 1174.66, 1318.5, 1479.98], tune = [0, 2, 4, 2, 5, 4, 2, 0, 1, 2, 4, 5, 7, 5, 4, 2];
-    this.bell(scale[tune[i % tune.length]], this.ctx.currentTime, 0.075, 0.55);
+    const scale = [587.33, 659.25, 739.99, 880, 987.77, 1174.66, 1318.5, 1479.98], tune = [0, 2, 4, 2, 5, 4, 2, 0, 1, 2, 4, 5, 7, 5, 4, 2], f = scale[tune[i % tune.length]];
+    // (afterwards the same tune, an octave down and going flat, like a music box running out)
+    if (wrong) this.bell(f * 0.5 * (0.955 + Math.random() * 0.03), this.ctx.currentTime, 0.05, 1.7);
+    else this.bell(f, this.ctx.currentTime, 0.075, 0.55);
+  }
+  /** Once, and loud: it is right there. */
+  sting() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    for (const f of [233.08, 246.94, 466.16, 493.88, 932.33]) this.bell(f, t, 0.2, 1.8);
+    this.whoosh(3200, 180, 0.55, 0.3, 0.5);
+  }
+  /** A heartbeat: two low knocks. */
+  beat(vol) {
+    this.whoosh(95, 46, 0.17, vol, 1.3);
+    setTimeout(() => this.whoosh(82, 40, 0.2, vol * 0.7, 1.3), 150);
   }
   /** Somebody else's footstep: lower and duller than the painter's own. */
   tread(vol) { this.whoosh(210 + Math.random() * 50, 90, 0.16, vol, 0.8); }

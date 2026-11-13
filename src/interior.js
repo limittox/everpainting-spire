@@ -183,6 +183,26 @@ export class Interior {
     });
   }
 
+  /** Afterwards: every painting the painter made and hung here is scratched through. */
+  deface(on) {
+    if (!on && !this.scratches) return;
+    if (!this.scratches) {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 176;
+      const x = c.getContext('2d');
+      let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      x.strokeStyle = '#0c0a10'; x.lineCap = x.lineJoin = 'round';
+      for (let i = 0; i < 16; i++) { x.lineWidth = 3 + r() * 6; x.beginPath(); x.moveTo(r() * 256, r() * 176); for (let k = 0; k < 3; k++) x.lineTo(r() * 256, r() * 176); x.stroke(); }
+      const mat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, fog: false });
+      this.scratches = this.slots.filter((s) => s.spot).map((s) => {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), mat), n = Math.hypot(C.x - s.pos.x, C.z - s.pos.z) || 1;
+        m.position.set(s.pos.x + ((C.x - s.pos.x) / n) * 0.06, s.pos.y, s.pos.z + ((C.z - s.pos.z) / n) * 0.06); m.rotation.y = s.a + Math.PI;
+        this.scene.add(m);
+        return m;
+      });
+    }
+    for (const m of this.scratches) m.visible = on;
+  }
+
   inside(p) { return p.y > C.y - 6; }
 
   /** Keep the painter within the walls. */
