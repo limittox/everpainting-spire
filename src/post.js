@@ -113,7 +113,8 @@ uniform float bloom;
 uniform vec2 texel;
 uniform float relief;
 uniform float sat;
-uniform float keepRed;    // 0..1: when the colour is gone, red that is nothing but red keeps its own
+uniform float keepRed;    // 0..1: when the colour is gone, whatever is marked as blood keeps its own
+uniform sampler2D tScene; // the scene as it was drawn: blood is the one thing in it that writes no alpha
 uniform float flash;
 uniform vec3 tint;
 uniform sampler2D tDepth;
@@ -155,8 +156,10 @@ void main() {
     c = mix(c, vec3(0.2, 0.19, 0.25), line * ink * 0.8);
   }
   float l = lum(c);
-  float red = keepRed * smoothstep(0.80, 0.93, (c.r - max(c.g, c.b)) / max(c.r, 0.001)) * step(0.1, c.r);
-  c = mix(vec3(l), c, mix(sat, 1.3, red));
+  c = mix(vec3(l), c, sat);
+  // (a mark, not a colour: a red tree is not blood, and a thin streak of blood far away is still blood)
+  float blood = keepRed * clamp(1.0 - texture2D(tScene, vUv).a, 0.0, 1.0);
+  c = mix(c, vec3(0.80, 0.02, 0.04) * (0.5 + 0.9 * l), blood);
   c = (c - 0.5) * 1.07 + 0.5;
   vec2 v = vUv - 0.5;
   c *= 1.0 - dot(v, v) * 0.38;                   // vignette
@@ -192,7 +195,7 @@ export class Painterly {
     this.matBlur = pass(BLUR, { dir: { value: new THREE.Vector2() } });
     this.matFinal = new THREE.ShaderMaterial({
       uniforms: {
-        tK: { value: null }, texel: { value: new THREE.Vector2() }, tBloom: { value: null }, bloom: { value: 1 },
+        tK: { value: null }, tScene: { value: null }, texel: { value: new THREE.Vector2() }, tBloom: { value: null }, bloom: { value: 1 },
         relief: { value: 1 }, sat: { value: 1.2 }, keepRed: { value: 0 }, flash: { value: 0 }, tint: { value: new THREE.Color(1, 1, 1) },
         tDepth: { value: null }, clip: { value: new THREE.Vector2(0.3, 2600) }, ink: { value: 0 },
       },
@@ -252,7 +255,7 @@ export class Painterly {
     }
     const u = this.matFinal.uniforms;
     u.tBloom.value = bA.texture; u.bloom.value = this.bloom;
-    u.tK.value = src;
+    u.tK.value = src; u.tScene.value = this.rtScene.texture;
     u.relief.value = this.mode === 0 ? 0.0 : this.mode === 1 ? 1.0 : 1.5;
     u.sat.value = this.sat; u.keepRed.value = this.keepRed;
     u.tDepth.value = this.rtScene.depthTexture; u.clip.value.set(camera.near, camera.far); u.ink.value = this.ink;

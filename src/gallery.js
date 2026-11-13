@@ -331,7 +331,7 @@ export class Gallery {
       }
       // afterwards: drops of red across the floor, from High Summer's frame to the way home
       {
-        const from = this.hung[1].at, to = this.backAt, blood = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.0, 0.012), fog: false, side: THREE.DoubleSide });
+        const from = this.hung[1].at, to = this.backAt, blood = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.0, 0.012), fog: false, side: THREE.DoubleSide, transparent: true, opacity: 0, blending: THREE.NoBlending });          // (no alpha: that is how the picture knows it for blood)
         this.trail = new THREE.Group();
         for (let i = 0; i < 24; i++) {
           const f = (i + 0.5) / 24, x = from.x + (to.x - from.x) * f + (rb() - 0.5) * 1.1, z = from.z + (to.z - from.z) * f + (rb() - 0.5) * 1.1;
@@ -469,7 +469,7 @@ export class Gallery {
         // the point the companions chase round the piper: a ring dance
         S.lead = { pos: new V3(), heading: 0, seat: null, grounded: true, lift: null, ride: null, gliding: false, vel: new V3() };
         // and what is found here afterwards: where each of them lies
-        const blood = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.0, 0.012), fog: false });
+        const blood = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.0, 0.012), fog: false, transparent: true, opacity: 0, blending: THREE.NoBlending });
         S.lie = [[2.2, 0.6], [-1.6, 2.1], [0.4, -2.6], [-2.8, -1.0], [3.1, -1.9], [-0.6, 3.6]].map(([ox, oz], i) => {
           const x = npcAt.x + ox, z = npcAt.z + oz, y = surfY(SUMMER, x, z), pool = new THREE.Group();
           for (const [dx, dz, rad, sq] of [[0, 0, 1.25, 0.72], [0.9, 0.5, 0.5, 1], [-0.7, 0.9, 0.34, 1], [1.5, -0.3, 0.2, 1]]) {
