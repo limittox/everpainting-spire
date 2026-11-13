@@ -83,7 +83,13 @@ export class Sound {
   /** How loud the music sits under everything else, 0..1. */
   setMusic(v) {
     this.musicVol = v;
-    if (this.music) this.music.gain.setTargetAtTime(1.25 * v, this.ctx.currentTime, 0.08);
+    if (this.music) this.music.gain.setTargetAtTime(1.25 * v * (this.hushK ?? 1), this.ctx.currentTime, 0.08);
+  }
+  /** Let the music sink away (k toward 0) or come back (1), slowly: for places where it does not belong. */
+  hush(k) {
+    if (k === (this.hushK ?? 1)) return;
+    this.hushK = k;
+    if (this.music) this.music.gain.setTargetAtTime(1.25 * this.musicVol * k, this.ctx.currentTime, 0.9);
   }
 
   /** How fast the painter is moving through the air, 0..1: drives the bed of wind. */

@@ -8,6 +8,8 @@ A calm, painterly wander across five floating islands. Walk, skate and glide thr
 
 There is no combat and nothing to fail. If you fall, the paint carries you back.
 
+> **A note before you play:** this game changes as it goes. It begins gently, but its later parts are unsettling, and are not for young children.
+
 ## Controls
 
 | Key | What it does |

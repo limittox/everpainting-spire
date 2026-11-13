@@ -873,6 +873,8 @@ function galleryAct(a) {
     moveTo(d.to.pos, d.to.heading, d.to.yaw ?? d.to.heading + Math.PI);
     game.hints.hung = true;
     if (d.to.island !== undefined) game.shownIsland = d.to.island;
+    // the picture of the room itself: no fanfare going in. The colour just goes
+    if (d.odd) { gallery.grey = !gallery.grey; if (gallery.grey) post.flash = 0; else sound.play('wind'); return; }
     sound.play(d.out ? 'wind' : 'vista');
     hud.toast(d.toast[0], d.toast[1], 4200);
     if (gallery.where(d.to.pos) === 'hall') hint('hung', 'Paintings, the day before the doors open. Not all of them are finished.', 8000);
@@ -1135,7 +1137,7 @@ function updatePlay(dt, t) {
   } else if (world.bridges[3].progress < 1) { goal = world.bridges[3].anchor; objective = 'Lay the last bridge to the Spire'; }
   else { goal = world.gate; objective = 'Step up to the glowing gate'; }
   if (pale) { goal = null; objective = !under.done ? 'Bring the Dry Stair its water' : !seedbed.grown ? 'Grow the way on' : !seedbed.lit ? 'Cross to the Kiln on warm air' : !lastpage.cleared ? 'Ride the Kiln\u2019s warm air north' : !lastpage.done ? 'Fill the four wells' : 'It is morning'; }      // nothing in the first level to point at from here
-  if (hung) { goal = null; objective = gallery.done ? 'Two pictures are finished. The others are not hung yet' : gallery.carry ? 'Find somewhere that wants water' : 'One picture has too much, another too little'; }
+  if (hung) { goal = null; objective = gallery.grey ? '' : gallery.done && gallery.slipped ? 'One of the dust sheets has come off' : gallery.done ? 'Two pictures are finished. The others are not hung yet' : gallery.carry ? 'Find somewhere that wants water' : 'One picture has too much, another too little'; }
   hud.objective(objective);
   game.guideT -= dt;
   if (goal && game.guideT <= 0 && !player.ride && !player.lift) {
@@ -1266,8 +1268,10 @@ function tick(dt) {
   const dawn = lastpage.done ? 1 : [under.done, seedbed.vines[0].progress >= 1, seedbed.vines[1].progress >= 1, seedbed.lit, lastpage.cleared, lastpage.done].filter(Boolean).length / 6;
   game.dawn = game.dawn === undefined ? dawn : game.dawn + (dawn - game.dawn) * (1 - Math.exp(-0.5 * dt));
   gallery.found = !!game.hints.hung;
-  gallery.update(dt, time, game.state === 'title' ? null : player);
-  const hung = gallery.look(camera.position);
+  gallery.update(dt, time, game.state === 'title' ? null : player, blots);
+  const hung = gallery.look(camera.position), grey = !!hung && hung.name === 'grey';
+  sound.hush(grey ? 0.08 : 1);
+  if (game.state === 'play') post.sat += ((grey ? 0.04 : game.won ? 1.42 : 1.22) - post.sat) * (1 - Math.exp(-1.6 * dt));
   day.set(game.day, hung ? hung.name : paper ? 'paper' : null, hung ? hung.at : game.dawn);
   post.ink += ((paper ? 1 : 0) - post.ink) * (1 - Math.exp(-8 * dt));
   world.sky.position.copy(camera.position);

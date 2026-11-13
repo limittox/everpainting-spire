@@ -66,7 +66,8 @@
   #title { align-items: flex-start; text-align: left; padding: 0 7vw 4vh; background: linear-gradient(90deg, rgba(36, 20, 74, 0.62), rgba(36, 20, 74, 0.34) 30%, rgba(36, 20, 74, 0) 62%); }
   #title > * { opacity: 0; animation: rise 1.3s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
   #title > :nth-child(1) { animation-delay: 0.7s; } #title > :nth-child(2) { animation-delay: 0.95s; } #title > :nth-child(3) { animation-delay: 1.25s; }
-  #title > :nth-child(4) { animation-delay: 1.6s; } #title > :nth-child(5) { animation-delay: 2.1s; }
+  #title > :nth-child(4) { animation-delay: 1.6s; } #title > :nth-child(5) { animation-delay: 2.1s; } #title > :nth-child(6) { animation-delay: 2.4s; }
+  #title #contentNote { font-size: 14px; margin: 10px 0 2px; max-width: 400px; color: rgba(251, 243, 255, 0.74); }
   /* a main button with quieter ones beside it */
   .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 30px; margin-top: 30px; }
   .overlay .row button { margin-top: 0; }
@@ -174,6 +175,7 @@
   <small id="titleKicker">A painterly wander</small>
   <h1>The Everpainting Spire</h1>
   <p id="titleText">The world is still wet. Follow the stroke across the sky, wake what sleeps along it, and lay the last one yourself.</p>
+  <p class="note" id="contentNote">This game changes as it goes. Its later parts are unsettling, and are not for young children.</p>
   <div class="row"><button id="begin">Begin</button><button class="quiet" id="openSettings">Settings</button><button class="quiet" id="titleOver" hidden>Start over</button></div>
   <div class="keys">
     <span><b>W A S D</b>walk</span><span><b>Mouse</b>look</span><span><b>Shift</b>skate</span>

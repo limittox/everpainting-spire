@@ -105,8 +105,14 @@ const BLAZE = { ...PAPER,
   cream: rgb(1.0, 1.0, 0.94), rose: rgb(1.0, 0.92, 0.78), violet: rgb(0.86, 0.80, 0.74), blue: rgb(0.62, 0.74, 0.95),
   sunCol: rgb(1.8, 1.6, 1.1), sunDir: dir(-0.1, 0.34, -1), fog: hex(0xf6e8c0), hemiSky: hex(0xfffbe8), hemiGround: hex(0xe0b070), hemiI: 1.75,
   sun: hex(0xfff6d8), sunI: 2.7, sunPos: dir(-0.15, 1.0, -0.35), far: hex(0xfaf0d0), cloud: hex(0xb0a080), tint: hex(0xfffbe6) };
+const GREY = { ...ROOM,
+  top: rgb(0.30, 0.30, 0.32), mid: rgb(0.42, 0.42, 0.44), hor: rgb(0.55, 0.55, 0.56), low: rgb(0.34, 0.34, 0.36),
+  cream: rgb(0.66, 0.66, 0.67), rose: rgb(0.50, 0.50, 0.52), violet: rgb(0.36, 0.36, 0.38), blue: rgb(0.40, 0.40, 0.42),
+  sunCol: rgb(0.7, 0.7, 0.72), fog: hex(0x77777c), hemiSky: hex(0xc8c8d0), hemiGround: hex(0x55555c), hemiI: 1.0,
+  sun: hex(0xd0d0d8), sunI: 0.8, far: hex(0x7c7c82), cloud: hex(0x4a4a50), tint: hex(0xe8e8f0) };
 const LOOKS = {
   paper: PAPERS,
+  grey: [{ t: 0, ...GREY }, { t: 1, ...GREY }],
   hall: [{ t: 0, ...ROOM }, { t: 1, ...ROOM }],
   flood: [{ t: 0, ...RAIN }, { t: 1, ...WASHED }],
   summer: [{ t: 0, ...BLAZE }, { t: 1, ...BLAZE, hemiGround: hex(0xb8c880), fog: hex(0xeef0c8) }],
