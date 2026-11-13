@@ -1300,6 +1300,7 @@ function tick(dt) {
   gallery.found = !!game.hints.hung;
   gallery.total = Math.max(1, spare().length);
   gallery.wear(player);
+  gallery.eye.copy(camera.position);
   sound.setThin(gallery.contains(player.pos) && !gallery.ended ? Math.min(3, gallery.lifts) : 0);
   gallery.update(dt, time, game.state === 'title' ? null : player, blots);
   for (const ev of gallery.events) {

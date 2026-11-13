@@ -197,6 +197,8 @@ export class Gallery {
     this.scene = scene; this.lastpage = lastpage; this.found = false;
     this.slipped = false; this.grey = false; this.hung = [];
     this.ghost = ghostMaterial(uTime);
+    this.shade = new THREE.MeshBasicMaterial({ color: 0x14121a, fog: false });       // the other painter, where it has not been painted yet: a dark shape
+    this.eye = new V3();                                                              // where the camera is (the game says), so it can stand where it will be seen
     this.taken = 0; this.total = 7;          // paints lifted off the painter so far, out of how many they had (the game says)
     this.walk = 0; this.greyT = 0; this.whole = false; this.wholeT = 0; this.ended = false; this.ending = null;
     this.mine = null; this.events = []; this._last = new V3();
@@ -500,7 +502,7 @@ export class Gallery {
     if (w === 'hall' && this.grey) {
       if (this.greyT < 5) return { key: 'grey', line: 'It is the same room.' };
       if (this.whole) return this.wholeT > 10 ? { key: 'forme', line: 'Every frame is shut now, except the empty one.' } : null;
-      if (this.taken === 0) return { key: 'other', line: 'Someone is standing at the far end of the room. Someone sketched, and never painted.' };
+      if (this.taken === 0) return { key: 'other', line: 'Someone is standing there. A painter, drawn and never painted.' };
       if (this.odd.at.distanceTo(p) < 5) return { key: 'shut', line: 'It is only a painting now.' };
       if (this.hung.some((h) => h.at.distanceTo(p) < 6)) return { key: 'someone', line: 'There is someone in it.' };
       return null;
@@ -586,6 +588,15 @@ export class Gallery {
         if (before <= 3.5 && this.wholeT > 3.5) ev.push({ type: 'gone', at: T.at });
       }
       T.root.visible = this.greyT > 5 && !(this.whole && this.wholeT > 3.5);
+      if (T.root.visible && !was) {
+        // it is simply there, in front of the painter, in the middle of whatever they were looking at
+        const p = player.pos, fx = p.x - this.eye.x, fz = p.z - this.eye.z, fl = Math.hypot(fx, fz) || 1;
+        let x = p.x + (fx / fl) * 9 - HALL.x, z = p.z + (fz / fl) * 9 - HALL.z, d = Math.hypot(x, z) || 1;
+        const lim = d > 12.5 ? 12.5 : d < 3.6 ? 3.6 : d;                        // inside the room, and not on the bench
+        x *= lim / d; z *= lim / d;
+        T.at.set(HALL.x + x, surfY(HALL, HALL.x + x, HALL.z + z), HALL.z + z);
+        T.root.position.copy(T.at); T.root.rotation.y = Math.atan2(p.x - T.at.x, p.z - T.at.z);
+      }
       // it watches the painter until it has everything; then it turns to the way home
       const to = this.whole ? this.backAt : player.pos, want = Math.atan2(to.x - T.at.x, to.z - T.at.z);
       T.root.rotation.y += Math.atan2(Math.sin(want - T.root.rotation.y), Math.cos(want - T.root.rotation.y)) * ease(this.whole ? 1.4 : 4);
@@ -594,7 +605,7 @@ export class Gallery {
     if (player) this._last.copy(player.pos);
     // what it takes, it is painted with; what the painter loses leaves them an outline
     const f = this.whole ? 1 : Math.min(1, this.taken / this.total), kT = Math.round((1 - f) * T.parts.length);
-    if (kT !== T.k) { T.k = kT; dress(T.parts, this.ghost, kT, false); }
+    if (kT !== T.k) { T.k = kT; dress(T.parts, this.shade, kT, false); }
 
     this.framePic.visible = this.ended;
     this.frameGlow.material.opacity += ((this.whole && this.wholeT > 3.5 && !this.ended ? 0.55 : 0) - this.frameGlow.material.opacity) * ease(1.5);
