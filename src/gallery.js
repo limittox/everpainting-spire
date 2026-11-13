@@ -4,6 +4,8 @@ import { daub, place, Bag, paintify, glowSprite, drawStroke, mulberry32, clamp, 
 import { underside, makeStream, SPAN, STONE } from './underpainting.js';
 import { PAGE } from './lastpage.js';
 import { PAINTS } from './paint.js';
+import { buildPainter } from './painter.js';
+import { ghostMaterial } from './sketches.js';
 
 // Varnishing Day: the third level. The painter steps out of the painting into the gallery where it hangs, the
 // day before the doors open. The pictures on the walls are nearly finished: each has too much of one thing and
@@ -21,6 +23,12 @@ import { PAINTS } from './paint.js';
 // painting it covered is a painting of this room, in grey, with someone standing in it wherever the painter stands.
 // Stepping into it leads to the same room with the colour gone out of it, the companions nowhere, every other
 // frame shut, and somebody in each of the pictures. From here on the game is not the gentle one it began as.
+//
+// Somebody is standing at the far end of that room: a painter like this one, sketched and never painted. It does not
+// move and it cannot be failed against. It does what the painter has learned to do: it lifts. With every few steps
+// the painter takes, one paint leaves their palette, one more part of them is only an outline, and one more part of
+// the other is painted in; and the colour comes back into the room. When there is only Cream left it goes home in
+// the painter's place. The one frame that opens after that is the empty one, and what hangs in it then is a portrait.
 // (It all lives far to the east of everything else, in the same scene.)
 
 const V3 = THREE.Vector3, TAU = Math.PI * 2;
@@ -73,13 +81,26 @@ function picture(base, pal, seed, extra = null) {
 }
 
 /** Someone, seen from behind (or from in front: there is no face either way), with a brush across their back. */
-function figure(x, u, v, s, col) {
-  x.fillStyle = x.strokeStyle = col;
-  x.beginPath(); x.moveTo(u - 13 * s, v); x.lineTo(u + 13 * s, v); x.lineTo(u + 7 * s, v - 44 * s); x.lineTo(u - 7 * s, v - 44 * s); x.closePath(); x.fill();
-  x.beginPath(); x.arc(u, v - 52 * s, 9 * s, 0, TAU); x.fill();
-  x.fillRect(u - 12 * s, v - 61 * s, 24 * s, 4 * s);
-  x.lineWidth = 2.5 * s; x.lineCap = 'round'; x.beginPath(); x.moveTo(u + 12 * s, v - 6 * s); x.lineTo(u + 20 * s, v - 68 * s); x.stroke();
+function figure(x, u, v, s, col, line = 0) {
+  x.fillStyle = x.strokeStyle = col; x.lineWidth = line || 2.5 * s; x.lineCap = x.lineJoin = 'round';
+  const lay = () => (line ? x.stroke() : x.fill());
+  x.beginPath(); x.moveTo(u - 13 * s, v); x.lineTo(u + 13 * s, v); x.lineTo(u + 7 * s, v - 44 * s); x.lineTo(u - 7 * s, v - 44 * s); x.closePath(); lay();
+  x.beginPath(); x.arc(u, v - 52 * s, 9 * s, 0, TAU); lay();
+  x.beginPath(); x.rect(u - 12 * s, v - 61 * s, 24 * s, 4 * s); lay();
+  x.beginPath(); x.moveTo(u + 12 * s, v - 6 * s); x.lineTo(u + 20 * s, v - 68 * s); x.stroke();
 }
+/** The meshes something is made of, lowest first, each remembering the material it was painted with. */
+function partsOf(roots, skip = []) {
+  const box = new THREE.Box3(), c = new V3(), list = [];
+  for (const r of roots) r.traverse((o) => {
+    if (!o.isMesh || skip.includes(o)) return;
+    o.userData.real = o.material; o.userData.h = box.setFromObject(o).getCenter(c).y;
+    list.push(o);
+  });
+  return list.sort((a, b) => a.userData.h - b.userData.h);
+}
+/** Leave `n` of those parts as a drawing (from the feet up, or from the head down) and the rest as they were painted. */
+const dress = (parts, ghost, n, fromFeet) => parts.forEach((m, i) => { m.material = (fromFeet ? i < n : i >= parts.length - n) ? ghost : m.userData.real; });
 /** A picture with somebody in it who was not there before. */
 function haunted(tex) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 320;
@@ -172,6 +193,10 @@ export class Gallery {
   constructor(scene, world, uTime, lastpage, atelier) {
     this.scene = scene; this.lastpage = lastpage; this.found = false;
     this.slipped = false; this.grey = false; this.hung = [];
+    this.ghost = ghostMaterial(uTime);
+    this.taken = 0; this.total = 7;          // paints lifted off the painter so far, out of how many they had (the game says)
+    this.walk = 0; this.greyT = 0; this.whole = false; this.wholeT = 0; this.ended = false; this.ending = null;
+    this.mine = null; this.events = []; this._last = new V3();
     const bag = new Bag(), add = (g, pal, o) => bag.add(daub(g, pal, o)), r = mulberry32(5521);
     const island = (def, tex, rock) => {
       const isl = { ...def, index: world.islands.length };
@@ -213,7 +238,7 @@ export class Gallery {
       const W = 3.6, H = 4.8;
       // the way in: a frame on the Blank Page (it stands once the sun is drawn). The way home leads to the Spire's
       // atelier, where a frame of its own stands from then on, so the gallery is never more than a step away.
-      const backAt = hp(Math.PI / 2, 15.5), pageAt = new V3(PAGE.x, surfY(PAGE, PAGE.x, PAGE.z - 14.5), PAGE.z - 14.5), pageMid = new V3(PAGE.x, PAGE.y, PAGE.z);
+      const backAt = (this.backAt = hp(Math.PI / 2, 15.5)), pageAt = new V3(PAGE.x, surfY(PAGE, PAGE.x, PAGE.z - 14.5), PAGE.z - 14.5), pageMid = new V3(PAGE.x, PAGE.y, PAGE.z);
       const homeAt = new V3(atelier.x + Math.sin(1.2 * Math.PI) * 9.6, atelier.y, atelier.z + Math.cos(1.2 * Math.PI) * 9.6);
       stand(lit(frame(W, H, pic.home), H), backAt, centre(HALL));
       this.pageDoor = stand(lit(frame(W, H, pic.hall), H), pageAt, pageMid);
@@ -260,10 +285,25 @@ export class Gallery {
         const off = new THREE.Mesh(daub(place(new THREE.IcosahedronGeometry(1, 2), at.x + n.x * 2.4 + n.z * 1.2, at.y + 0.14, at.z + n.z * 2.4 - n.x * 1.2, 0, 0.7, 0, 2.1, 0.17, 1.4), CLOTH, { scale: 0.5, spread: 1 }), cloth);
         scene.add(on, off);
         this.odd = { at, n, right: new V3(n.z, 0, -n.x), cv, tex, on, off, key: '', rooms: [roomPicture(false), roomPicture(true)] };
-        this.doors.push({ at, text: 'Step into the picture', to: arrive(at, centre(HALL), hall, flat(HALL)), odd: true, open: () => this.slipped });
+        this.doors.push({ at, text: 'Step into the picture', to: arrive(at, centre(HALL), hall, flat(HALL)), odd: true, open: () => this.slipped && !this.ended });
       }
       this.empty = hp(-Math.PI / 2, 15.2);
-      stand(frame(6.4, 7.6, null), this.empty, centre(HALL));
+      {
+        // what will hang in it: a portrait in pencil. Until then, bare boards
+        const paper = ['#ebe5da', '#e2dccf', '#f8f4ec', '#d8d2c6'];
+        const g = stand(frame(6.4, 7.6, picture('#f1ece2', paper, 95, (x) => figure(x, 128, 298, 3.3, '#4a4854', 4))), this.empty, centre(HALL));
+        this.framePic = g.userData.pic; this.framePic.visible = false;
+        this.frameGlow = glowSprite(world.glowTex, 13, 0xffffff, 0); this.frameGlow.position.set(0, 4.3, 1); g.add(this.frameGlow);
+        this.doors.push({ at: this.empty, text: 'Step into the frame', to: arrive(this.empty, centre(HALL), hall, flat(HALL)), frame: true, open: () => this.whole && this.wholeT > 3.5 && !this.ended });
+      }
+      // the other painter stands in front of the way home
+      {
+        const m = buildPainter(); m.handBrush.visible = false; m.easelBrush.visible = false;
+        const at = hp(Math.PI / 2, 11.5);
+        m.root.position.copy(at); m.root.rotation.y = Math.PI; m.root.visible = false;
+        scene.add(m.root); m.root.updateMatrixWorld(true);
+        this.other = { root: m.root, at, parts: partsOf([m.root]), k: -1 };
+      }
       world.colliders.push({ x: this.empty.x - 2.2, z: this.empty.z, r: 1.4, late: true }, { x: this.empty.x + 2.2, z: this.empty.z, r: 1.4, late: true });
 
       // a round bench in the middle, and more of the gallery hanging far off in the haze
@@ -413,7 +453,7 @@ export class Gallery {
 
   /** What E would do for a painter standing at `p`, if anything: step through a frame, lift something, lay it down. */
   near(p) {
-    for (const d of this.doors) if ((!d.open || d.open()) && (!this.grey || d.odd) && Math.abs(d.at.y - p.y) < 2.5 && d.at.distanceTo(p) < 3.9) return { type: 'door', door: d, text: d.text };
+    for (const d of this.doors) if ((!d.open || d.open()) && (this.grey ? !!d.frame : !d.frame) && Math.abs(d.at.y - p.y) < 2.5 && d.at.distanceTo(p) < 3.9) return { type: 'door', door: d, text: d.text };
     const w = this.where(p), F = this.flood;
     if (w === 'flood') {
       const d = Math.hypot(p.x - FLOOD.x, p.z - FLOOD.z), edge = F.level === 0 ? d > 12 && d < 21 : d > shoreR(F.wy) - 2.4;      // (with no water left, the low ground is where it goes back)
@@ -428,6 +468,13 @@ export class Gallery {
       if (this.carry === 'water' && !s.wet) return { type: 'lay', text: s.lay, at: s.top, spot: s };
     }
     return null;
+  }
+
+  /** Stepping into the empty frame: the painter is the portrait now. Sets up the last look at the room. */
+  frameIn() {
+    this.grey = false; this.ended = true;
+    const n = new V3(HALL.x - this.empty.x, 0, HALL.z - this.empty.z).normalize();
+    this.ending = { t: 0, cam: this.empty.clone().addScaledVector(n, 13).setY(HALL.y + 4.4), look: this.empty.clone().setY(HALL.y + 4.3), dir: n.clone().negate() };
   }
 
   /** Lift or lay, as `near` offered. Returns what happened, and the name of a picture this has just finished. */
@@ -447,9 +494,14 @@ export class Gallery {
   waiting(p) {
     const w = this.where(p);
     if (w === 'hall' && this.grey) {
+      if (this.greyT < 5) return { key: 'grey', line: 'It is the same room.' };
+      if (this.whole) return this.wholeT > 10 ? { key: 'forme', line: 'Every frame is shut now, except the empty one.' } : null;
+      if (this.taken === 0) return { key: 'other', line: 'Someone is standing at the far end of the room. Someone sketched, and never painted.' };
+      if (this.odd.at.distanceTo(p) < 5) return { key: 'shut', line: 'It is only a painting now.' };
       if (this.hung.some((h) => h.at.distanceTo(p) < 6)) return { key: 'someone', line: 'There is someone in it.' };
-      return { key: 'grey', line: 'It is the same room.' };
+      return null;
     }
+    if (w === 'hall' && this.ended) return this.empty.distanceTo(p) < 7 ? { key: 'portrait', line: 'A portrait of a painter, in pencil. It was never finished.' } : null;
     if (w === 'hall') {
       if (this.slipped && this.odd.at.distanceTo(p) < 7) return { key: 'odd', line: 'A painting of this room. Whoever is in it is standing where you are.' };
       if (this.draped.some((q) => q.distanceTo(p) < 4.6)) return { key: 'draped', line: 'Still under its dust sheet. It has not been hung yet.' };
@@ -464,10 +516,13 @@ export class Gallery {
     return null;
   }
 
-  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0 }; }
+  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0 }; }
   load(d) {
     if (!d) return;
-    this.slipped = !!d.slipped; this.grey = this.slipped && !!d.grey;
+    this.slipped = !!d.slipped; this.ended = this.slipped && !!d.ended; this.grey = this.slipped && !!d.grey && !this.ended;
+    this.taken = Number.isInteger(d.taken) && d.taken > 0 && this.slipped ? Math.min(d.taken, PAINTS.length) : 0;
+    this.whole = this.ended || (this.slipped && !!d.whole);
+    if (this.whole) this.wholeT = 99;
     const F = this.flood, S = this.summer, level = [0, 1, 2].includes(d.level) ? d.level : 2, wet = S.spots.map((_, i) => !!(d.wet && d.wet[i]));
     const held = 2 - level - wet.filter(Boolean).length;          // there are two brushfuls in all: any that is nowhere is on the brush
     if (held < 0 || held > 1) return;
@@ -485,15 +540,50 @@ export class Gallery {
     O.on.visible = !this.slipped; O.off.visible = this.slipped;
     if (this.slipped && inHall) {
       const dx = player.pos.x - O.at.x, dz = player.pos.z - O.at.z, lat = dx * O.right.x + dz * O.right.z, out = dx * O.n.x + dz * O.n.z;
-      const u = Math.round(clamp(128 + lat * 9, 26, 230) / 2) * 2, s = Math.round(clamp(0.5 + out / 11, 0.6, 1.9) * 30) / 30, key = this.grey ? 'grey' : u + ':' + s;
+      const bare = this.grey || this.ended;                          // (once stepped into, nobody is in it any more)
+      const u = Math.round(clamp(128 + lat * 9, 26, 230) / 2) * 2, s = Math.round(clamp(0.5 + out / 11, 0.6, 1.9) * 30) / 30, key = bare ? 'bare' : u + ':' + s;
       if (key !== O.key) {
         O.key = key;
         const x = O.cv.getContext('2d');
-        x.drawImage(O.rooms[this.grey ? 1 : 0].image, 0, 0);          // (from inside, it shows the room as it was left: nobody in it)
-        if (!this.grey) figure(x, u, 206 + s * 44, s, '#2c2a32');
+        x.drawImage(O.rooms[bare ? 1 : 0].image, 0, 0);
+        if (!bare) figure(x, u, 206 + s * 44, s, '#2c2a32');
         O.tex.needsUpdate = true;
       }
     }
+    // the grey room: someone at the far end, who takes a paint for every few steps the painter walks
+    const ev = this.events, T = this.other, was = T.root.visible;
+    ev.length = 0;
+    if (this.grey && player) {
+      this.greyT += dt;
+      if (!this.whole && this.greyT > 5) {
+        this.walk += Math.min(1, Math.hypot(player.pos.x - this._last.x, player.pos.z - this._last.z));
+        if (this.walk > 4.5) {
+          this.walk = 0; this.taken++;
+          if (this.taken >= this.total) { this.whole = true; this.wholeT = 0; }
+          ev.push({ type: 'take', n: this.taken, last: this.whole, at: T.at });
+        }
+      } else if (this.whole) {
+        const before = this.wholeT; this.wholeT += dt;
+        if (before <= 3.5 && this.wholeT > 3.5) ev.push({ type: 'gone', at: T.at });
+      }
+      T.root.visible = this.greyT > 5 && !(this.whole && this.wholeT > 3.5);
+      // it watches the painter until it has everything; then it turns to the way home
+      const to = this.whole ? this.backAt : player.pos, want = Math.atan2(to.x - T.at.x, to.z - T.at.z);
+      T.root.rotation.y += Math.atan2(Math.sin(want - T.root.rotation.y), Math.cos(want - T.root.rotation.y)) * ease(this.whole ? 1.4 : 4);
+    } else T.root.visible = false;
+    if (T.root.visible && !was) ev.push({ type: 'appear', at: T.at });
+    if (player) this._last.copy(player.pos);
+    // what it takes, it is painted with; what the painter loses leaves them an outline
+    const f = this.whole ? 1 : Math.min(1, this.taken / this.total), kT = Math.round((1 - f) * T.parts.length);
+    if (kT !== T.k) { T.k = kT; dress(T.parts, this.ghost, kT, false); }
+    if (player) {
+      if (!this.mine) this.mine = { parts: partsOf([player.model.root, player.cape.mesh], [player.model.tip, player.model.backTip, player.model.easelTip]), k: 0 };
+      const kM = Math.round(f * this.mine.parts.length);
+      if (kM !== this.mine.k) { this.mine.k = kM; dress(this.mine.parts, this.ghost, kM, true); }
+    }
+    this.framePic.visible = this.ended;
+    this.frameGlow.material.opacity += ((this.whole && this.wholeT > 3.5 && !this.ended ? 0.55 : 0) - this.frameGlow.material.opacity) * ease(1.5);
+    if (this.ending) this.ending.t += dt;
     const gone = this.grey && inHall;
     for (const h of this.hung) h.pic.material.map = gone ? h.grey : h.tex;
     // the companions will not go near that picture, and they do not come through it

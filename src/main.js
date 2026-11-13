@@ -375,7 +375,7 @@ for (const id of ['startOver', 'titleOver']) {
 function secondJourney() {
   store.restart({
     v: SAVE_VERSION, at: Date.now(), fresh: true, journey: game.journey + 1,
-    keep: palette().filter((i) => PAINTS[i].hidden), tints: blots.map((b) => b.color), reach: !!game.reach,
+    keep: allPaints().filter((i) => PAINTS[i].hidden), tints: blots.map((b) => b.color), reach: !!game.reach,
     hints: ['move', 'paint', 'skate', 'glide', 'map', 'wind', 'rise', 'gallery', 'photo'].filter((k) => game.hints[k]),
   });
   location.reload();
@@ -697,7 +697,9 @@ function wakeBlot(b) {
 }
 
 // which paint is on the brush: Q or right-click for the next one, 1-8 to pick
-const palette = () => PAINTS.map((p, i) => i).filter((i) => !PAINTS[i].hidden || game.keep.includes(i) || secrets.places.some((s) => s.found && s.paint === i));
+const allPaints = () => PAINTS.map((p, i) => i).filter((i) => !PAINTS[i].hidden || game.keep.includes(i) || secrets.places.some((s) => s.found && s.paint === i));
+const spare = () => allPaints().filter((i) => i !== 4);          // everything but Cream: what can be taken from the painter
+const palette = () => { const gone = spare().slice(0, gallery.taken); return allPaints().filter((i) => !gone.includes(i)); };
 function setPaint(i, quiet = false) {
   const list = palette();
   game.paint = list.includes(i) ? i : list[0];
@@ -874,7 +876,15 @@ function galleryAct(a) {
     game.hints.hung = true;
     if (d.to.island !== undefined) game.shownIsland = d.to.island;
     // the picture of the room itself: no fanfare going in. The colour just goes
-    if (d.odd) { gallery.grey = !gallery.grey; if (gallery.grey) post.flash = 0; else sound.play('wind'); return; }
+    if (d.odd) { gallery.grey = true; gallery.greyT = 0; post.flash = 0; return; }
+    // the empty frame: the painter is the portrait now. One long look at the room, and then the title
+    if (d.frame) {
+      gallery.frameIn();
+      player.group.visible = false; player.cape.mesh.visible = false;
+      sound.play('vista');
+      hud.toast('Portrait of a painter', 'Unfinished', 8000);
+      return;
+    }
     sound.play(d.out ? 'wind' : 'vista');
     hud.toast(d.toast[0], d.toast[1], 4200);
     if (gallery.where(d.to.pos) === 'hall') hint('hung', 'Paintings, the day before the doors open. Not all of them are finished.', 8000);
@@ -943,9 +953,27 @@ function updateRest(dt, t) {
   updateCamera(dt);
 }
 
+/** The last look at the gallery: the room in colour again, the new portrait in the big frame, and nobody to move. */
+function updateEnding(dt, t) {
+  const e = gallery.ending;
+  player.update(dt, t, IDLE, view.yaw, world);
+  for (const b of blots) b.update(dt, t, player);
+  hud.prompt(null); hud.objective('');
+  updateCamera(dt);
+  camera.position.copy(e.cam).addScaledVector(e.dir, Math.min(3, e.t * 0.3));
+  camera.lookAt(e.look);
+  if (e.t > 10 && !e.out) {
+    e.out = true;
+    saveGame();
+    document.getElementById('fade').classList.remove('clear');
+    setTimeout(() => location.reload(), 2600);
+  }
+}
+
 function updatePlay(dt, t) {
   game.playT += dt;
   if (game.rest) { updateRest(dt, t); return; }
+  if (gallery.ending) { updateEnding(dt, t); return; }
   const input = {
     mx: (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0),
     mz: (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0),
@@ -1137,7 +1165,7 @@ function updatePlay(dt, t) {
   } else if (world.bridges[3].progress < 1) { goal = world.bridges[3].anchor; objective = 'Lay the last bridge to the Spire'; }
   else { goal = world.gate; objective = 'Step up to the glowing gate'; }
   if (pale) { goal = null; objective = !under.done ? 'Bring the Dry Stair its water' : !seedbed.grown ? 'Grow the way on' : !seedbed.lit ? 'Cross to the Kiln on warm air' : !lastpage.cleared ? 'Ride the Kiln\u2019s warm air north' : !lastpage.done ? 'Fill the four wells' : 'It is morning'; }      // nothing in the first level to point at from here
-  if (hung) { goal = null; objective = gallery.grey ? '' : gallery.done && gallery.slipped ? 'One of the dust sheets has come off' : gallery.done ? 'Two pictures are finished. The others are not hung yet' : gallery.carry ? 'Find somewhere that wants water' : 'One picture has too much, another too little'; }
+  if (hung) { goal = null; objective = gallery.grey || gallery.ended ? '' : gallery.done && gallery.slipped ? 'One of the dust sheets has come off' : gallery.done ? 'Two pictures are finished. The others are not hung yet' : gallery.carry ? 'Find somewhere that wants water' : 'One picture has too much, another too little'; }
   hud.objective(objective);
   game.guideT -= dt;
   if (goal && game.guideT <= 0 && !player.ride && !player.lift) {
@@ -1268,10 +1296,31 @@ function tick(dt) {
   const dawn = lastpage.done ? 1 : [under.done, seedbed.vines[0].progress >= 1, seedbed.vines[1].progress >= 1, seedbed.lit, lastpage.cleared, lastpage.done].filter(Boolean).length / 6;
   game.dawn = game.dawn === undefined ? dawn : game.dawn + (dawn - game.dawn) * (1 - Math.exp(-0.5 * dt));
   gallery.found = !!game.hints.hung;
+  gallery.total = Math.max(1, spare().length);
   gallery.update(dt, time, game.state === 'title' ? null : player, blots);
+  for (const ev of gallery.events) {
+    if (ev.type === 'take') {
+      // one paint, lifted off the painter and laid on the other
+      const lost = PAINTS[spare()[ev.n - 1]];
+      fx.burst(tmp.copy(player.pos).setY(player.pos.y + 1.5), 26, { speed: 3, up: 6, colors: [lost.hex, lost.hex, '#ffffff'], size: 0.34, life: 1.1, gravity: 2 });
+      fx.burst(tmp.copy(ev.at).setY(ev.at.y + 1.3), 20, { speed: 2.4, up: 3, colors: [lost.hex, '#ffffff'], size: 0.3, life: 1.0, gravity: 5 });
+      sound.play('pour');
+      setPaint(game.paint, true);
+      hud.hint(ev.last ? 'Only Cream is left. Cream is blank.' : ev.n === 1 ? lost.name + ' has gone from your palette.' : ev.n === 2 ? lost.name + '. It lifts things too.' : lost.name + '.', ev.n < 3 || ev.last ? 6500 : 3200);
+      saveSoon();
+    } else if (ev.type === 'gone') {
+      fx.burst(tmp.copy(ev.at).setY(ev.at.y + 1.3), 40, { speed: 4, up: 5, colors: ['#ffffff', '#fff6e2'], size: 0.36, life: 1.2, gravity: 3 });
+      sound.play('wind');
+      blots.forEach((b) => b.setColor('#c4c2c8'));          // and the companions' colours with it
+      hud.hint('It has everything now. It has gone home.', 7500);
+      saveSoon();
+    }
+  }
   const hung = gallery.look(camera.position), grey = !!hung && hung.name === 'grey';
   sound.hush(grey ? 0.08 : 1);
-  if (game.state === 'play') post.sat += ((grey ? 0.04 : game.won ? 1.42 : 1.22) - post.sat) * (1 - Math.exp(-1.6 * dt));
+  // the grey room has no colour until the other painter starts taking it from the painter
+  const drained = grey ? 1 - Math.min(1, gallery.taken / gallery.total) : 0, bright = game.won ? 1.42 : 1.22;
+  if (game.state === 'play') post.sat += (bright + (0.04 - bright) * drained - post.sat) * (1 - Math.exp(-1.6 * dt));
   day.set(game.day, hung ? hung.name : paper ? 'paper' : null, hung ? hung.at : game.dawn);
   post.ink += ((paper ? 1 : 0) - post.ink) * (1 - Math.exp(-8 * dt));
   world.sky.position.copy(camera.position);
