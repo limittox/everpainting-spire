@@ -122,10 +122,16 @@ export class Sound {
     this.resting = on;
     if (this.ctx) this.applyLevel(1.5);
   }
+  /** Take layers away from the music, from the top down: 1 the melody, 2 the arpeggio as well, 3 the bass as well. */
+  setThin(n) {
+    if (n === (this.thin || 0)) return;
+    this.thin = n;
+    if (this.ctx) this.applyLevel(3);
+  }
   applyLevel(tc) {
-    const now = this.ctx.currentTime, L = this.level;
+    const now = this.ctx.currentTime, L = this.level, T = this.thin || 0;
     const set = (name, v) => this.bus[name].gain.setTargetAtTime(v, now, tc);
-    set('bass', L >= 1 ? 1 : 0); set('arp', L >= 2 ? (this.resting ? 0.45 : 1) : 0); set('song', L >= 3 || this.resting ? 1 : 0);
+    set('bass', L >= 1 && T < 3 ? 1 : 0); set('arp', L >= 2 && T < 2 ? (this.resting ? 0.45 : 1) : 0); set('song', (L >= 3 || this.resting) && T < 1 ? 1 : 0);
     set('pad', L >= 5 ? 1.25 : 1);
   }
 

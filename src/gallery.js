@@ -29,6 +29,9 @@ import { ghostMaterial } from './sketches.js';
 // the painter takes, one paint leaves their palette, one more part of them is only an outline, and one more part of
 // the other is painted in; and the colour comes back into the room. When there is only Cream left it goes home in
 // the painter's place. The one frame that opens after that is the empty one, and what hangs in it then is a portrait.
+//
+// It does not come from nowhere. Each time something is lifted the music loses a layer; the dust sheet over that
+// picture hangs a little lower every time the painter comes back into the room; and the game counts the lifts.
 // (It all lives far to the east of everything else, in the same scene.)
 
 const V3 = THREE.Vector3, TAU = Math.PI * 2;
@@ -197,6 +200,7 @@ export class Gallery {
     this.taken = 0; this.total = 7;          // paints lifted off the painter so far, out of how many they had (the game says)
     this.walk = 0; this.greyT = 0; this.whole = false; this.wholeT = 0; this.ended = false; this.ending = null;
     this.mine = null; this.events = []; this._last = new V3();
+    this.lifts = 0; this.visits = 0; this._inHall = false;          // how often something has been lifted; how often the room has been come back to
     const bag = new Bag(), add = (g, pal, o) => bag.add(daub(g, pal, o)), r = mulberry32(5521);
     const island = (def, tex, rock) => {
       const isl = { ...def, index: world.islands.length };
@@ -481,7 +485,7 @@ export class Gallery {
   act(a) {
     const F = this.flood;
     if (a.type === 'lift') {
-      this.carry = 'water';
+      this.carry = 'water'; this.lifts++;
       if (a.spot) a.spot.wet = false; else F.level--;
       return { type: 'lift', at: a.at, finished: !a.spot && F.level === 0 ? ['The Flood', 'The orchard stands on dry ground'] : null };
     }
@@ -516,13 +520,14 @@ export class Gallery {
     return null;
   }
 
-  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0 }; }
+  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
   load(d) {
     if (!d) return;
     this.slipped = !!d.slipped; this.ended = this.slipped && !!d.ended; this.grey = this.slipped && !!d.grey && !this.ended;
     this.taken = Number.isInteger(d.taken) && d.taken > 0 && this.slipped ? Math.min(d.taken, PAINTS.length) : 0;
     this.whole = this.ended || (this.slipped && !!d.whole);
     if (this.whole) this.wholeT = 99;
+    this.lifts = Number.isInteger(d.lifts) && d.lifts > 0 ? d.lifts : 0; this.visits = Number.isInteger(d.visits) && d.visits > 0 ? d.visits : 0;
     const F = this.flood, S = this.summer, level = [0, 1, 2].includes(d.level) ? d.level : 2, wet = S.spots.map((_, i) => !!(d.wet && d.wet[i]));
     const held = 2 - level - wet.filter(Boolean).length;          // there are two brushfuls in all: any that is nowhere is on the brush
     if (held < 0 || held > 1) return;
@@ -532,12 +537,26 @@ export class Gallery {
     this.carry = held ? 'water' : null;
   }
 
+  /** The painter is an outline as far up as their paints have been taken: on the title screen too, afterwards. */
+  wear(player) {
+    if (!this.mine) this.mine = { parts: partsOf([player.model.root, player.cape.mesh], [player.model.tip, player.model.backTip, player.model.easelTip]), k: 0 };
+    const k = Math.round((this.whole ? 1 : Math.min(1, this.taken / this.total)) * this.mine.parts.length);
+    if (k !== this.mine.k) { this.mine.k = k; dress(this.mine.parts, this.ghost, k, true); }
+  }
+
   update(dt, t, player, blots = null) {
     const F = this.flood, S = this.summer, ease = (k) => 1 - Math.exp(-k * dt);
     // the sheet goes while nobody is looking; the picture under it shows whoever is in the room, from behind
     const O = this.odd, inHall = !!player && this.where(player.pos) === 'hall';
     if (!this.slipped && this.done && player && !inHall) this.slipped = true;
     O.on.visible = !this.slipped; O.off.visible = this.slipped;
+    // every time the room is come back to, the sheet hangs a little lower and a little to one side
+    if (inHall && !this._inHall) {
+      this.visits++;
+      const k = Math.min(3, this.visits - 1), side = k ? (this.visits % 2 ? 0.12 : -0.12) : 0;
+      O.on.position.set(O.right.x * side, -0.18 * k, O.right.z * side);
+    }
+    this._inHall = inHall;
     if (this.slipped && inHall) {
       const dx = player.pos.x - O.at.x, dz = player.pos.z - O.at.z, lat = dx * O.right.x + dz * O.right.z, out = dx * O.n.x + dz * O.n.z;
       const bare = this.grey || this.ended;                          // (once stepped into, nobody is in it any more)
@@ -576,11 +595,7 @@ export class Gallery {
     // what it takes, it is painted with; what the painter loses leaves them an outline
     const f = this.whole ? 1 : Math.min(1, this.taken / this.total), kT = Math.round((1 - f) * T.parts.length);
     if (kT !== T.k) { T.k = kT; dress(T.parts, this.ghost, kT, false); }
-    if (player) {
-      if (!this.mine) this.mine = { parts: partsOf([player.model.root, player.cape.mesh], [player.model.tip, player.model.backTip, player.model.easelTip]), k: 0 };
-      const kM = Math.round(f * this.mine.parts.length);
-      if (kM !== this.mine.k) { this.mine.k = kM; dress(this.mine.parts, this.ghost, kM, true); }
-    }
+
     this.framePic.visible = this.ended;
     this.frameGlow.material.opacity += ((this.whole && this.wholeT > 3.5 && !this.ended ? 0.55 : 0) - this.frameGlow.material.opacity) * ease(1.5);
     if (this.ending) this.ending.t += dt;

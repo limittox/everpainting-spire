@@ -894,7 +894,9 @@ function galleryAct(a) {
   player.swing();
   sound.play('pour'); sound.pluck(true);
   fx.burst(ev.at, 34, { speed: 4.5, up: ev.type === 'lift' ? 7 : 4, colors: ['#8fdcff', '#58c0e8', '#ffffff'], size: 0.36, life: 1.0, gravity: ev.type === 'lift' ? 3 : 9 });
-  if (ev.type === 'lift') hint('lifted', 'The brush is holding the water now. Carry it to a picture that wants it.', 8500);
+  // (the voice that has been explaining things changes its tone, the second time something is taken)
+  if (ev.type === 'lift') { if (gallery.lifts === 2) hint('putback', 'Put it back.', 6500); else hint('lifted', 'The brush is holding the water now. Carry it to a picture that wants it.', 8500); }
+  else if (!a.spot && game.hints.putback) hint('thanks', 'Thank you.', 5000);
   else if (!ev.finished) hint('laid', 'It stays where you lay it. Anything you take can be put back.', 7500);
   if (ev.finished) { sound.play('vista'); post.flash = 0.2; hud.toast(ev.finished[0], ev.finished[1], 5200); cheerAll(); }
   saveSoon();
@@ -1297,6 +1299,8 @@ function tick(dt) {
   game.dawn = game.dawn === undefined ? dawn : game.dawn + (dawn - game.dawn) * (1 - Math.exp(-0.5 * dt));
   gallery.found = !!game.hints.hung;
   gallery.total = Math.max(1, spare().length);
+  gallery.wear(player);
+  sound.setThin(gallery.contains(player.pos) && !gallery.ended ? Math.min(3, gallery.lifts) : 0);
   gallery.update(dt, time, game.state === 'title' ? null : player, blots);
   for (const ev of gallery.events) {
     if (ev.type === 'take') {
