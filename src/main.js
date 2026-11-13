@@ -740,6 +740,27 @@ function doSwing() {
   }
   garden.wakeNear(player.pos, 5.2);
   for (const { sketch, fresh } of sketches.strike(sx, sz, player.pos, hex)) paintSketch(sketch, fresh, hex);
+  for (const ev of gallery.strike(sx, sz, player.pos, hex)) {
+    fx.burst(ev.at, 46, { speed: 5, up: 6, colors: ['#fff4dc', '#ffffff', '#f1ece2'], size: 0.4, life: 1.3, gravity: 5 });
+    sound.play('paint'); sound.pluck(true);
+    if (ev.type === 'wipe') hud.hint(ev.n === 1 ? 'Cream takes paint back to paper. There is not much of you left.' : 'Once more, and there was never a painter.', 8000);
+    else if (ev.type === 'erased') {
+      // the painter has painted themself out: one look at the bare paper, and then nothing to come back to
+      player.group.visible = false; player.cape.mesh.visible = false;
+      sound.play('wind');
+      hud.toast('There was a painter here', '', 9000);
+    } else if (ev.type === 'unpaint') {
+      setPaint(game.paint, true);
+      hud.hint(ev.n === 1 ? 'It has turned round. Some of your colours are yours again.' : 'It is coming apart.', 7500);
+    } else if (ev.type === 'undone') {
+      // the other one is painted out, and everything it took comes home
+      post.flash = 0.5; sound.play('finale');
+      setPaint(game.paint, true);
+      hud.toast('The painter', 'It is yours again', 6500);
+      hud.hint('The colours are yours again. Not everything comes back.', 9000);
+    }
+    saveSoon();
+  }
   const sown = seedbed.strike(sx, sz, player.pos, hex);          // (first: the swing that uncovers a seed must not also paint it)
   for (const ev of lastpage.strike(sx, sz, player.pos, hex)) {
     if (ev.type === 'smear') { hud.hint('More paint will not shift it. Cream takes paint back to paper.', 6500); continue; }
@@ -966,7 +987,7 @@ function updateEnding(dt, t) {
   camera.lookAt(e.look);
   if (e.t > 10 && !e.out) {
     e.out = true;
-    saveGame();
+    if (e.erase) { store.clear(); store.dead = true; } else saveGame();          // painted out: the journey is gone, for good
     document.getElementById('fade').classList.remove('clear');
     setTimeout(() => location.reload(), 2600);
   }
@@ -1248,7 +1269,7 @@ function updateFinale(dt, t) {
     $id('titleOver').hidden = false;
   }
   // afterwards, the game itself is not quite the same (starting over still works, whatever it says)
-  if (gallery.ended) {
+  if (gallery.bleak) {
     $id('begin').textContent = 'Come back';
     for (const id of ['startOver', 'titleOver']) { const b = $id(id); b.dataset.label = b.textContent = 'It won\u2019t help'; }
   }
@@ -1305,10 +1326,11 @@ function tick(dt) {
   gallery.found = !!game.hints.hung;
   gallery.total = Math.max(1, spare().length);
   gallery.eye.copy(camera.position);
+  gallery.indoors = game.state === 'play' && interior.inside(player.pos);
   gallery.outdoors = game.state === 'play' && !gallery.contains(player.pos) && !under.contains(player.pos) && !interior.inside(player.pos);
   game.jolt = Math.max(0, (game.jolt || 0) - dt * 2.4);
   camera.getWorldDirection(tmp); gallery.gaze.set(tmp.x, 0, tmp.z).normalize();
-  sound.setThin(gallery.ended ? 3 : gallery.contains(player.pos) ? Math.min(3, gallery.lifts) : 0);
+  sound.setThin(gallery.bleak ? 3 : gallery.contains(player.pos) ? Math.min(3, gallery.lifts) : 0);
   gallery.update(dt, time, game.state === 'title' ? null : player, blots);
   for (const ev of gallery.events) {
     if (ev.type === 'tread') {
@@ -1316,7 +1338,8 @@ function tick(dt) {
       const vol = 0.03 + 0.15 * ev.near;
       if (ev.late) setTimeout(() => sound.tread(vol), 230); else sound.tread(vol);
       hint('moves', 'It moves when you cannot see it.', 8000);
-    } else if (ev.type === 'beat') sound.beat(0.07 + 0.3 * ev.near);
+    } else if (ev.type === 'say') hint(ev.key, ev.line, 8500);
+    else if (ev.type === 'beat') sound.beat(0.07 + 0.3 * ev.near);
     else if (ev.type === 'scare') { sound.sting(); game.jolt = 1; }          // once only: it is right there
     else if (ev.type === 'dirge') { if (settings.values.music > 0) sound.jig(ev.i, true); }
     else if (ev.type === 'note') { if (settings.values.music > 0) sound.jig(ev.i); }
@@ -1346,14 +1369,15 @@ function tick(dt) {
     }
   }
   const hung = gallery.look(camera.position), grey = !!hung && hung.name === 'grey';
-  sound.hush(grey ? 0 : gallery.ended ? 0.9 : 1);
-  sound.setDark(gallery.ended);
+  sound.hush(grey ? 0 : gallery.bleak ? 0.9 : 1);
+  sound.setDark(gallery.bleak);
   sound.breath(grey ? gallery.close : 0);
   if (!gallery.dark && game.wasDark) { game.wasDark = false; day.t = -1; }          // (the light comes back: have the day lay its own tint again)
   // the grey room has no colour until the other painter starts taking it from the painter
   // there is no colour in the grey room, and after the portrait there is none anywhere, ever: only red that is nothing but red
-  const mono = grey || gallery.ended;
-  if (game.state !== 'finale') post.sat += ((mono ? 0.03 : game.won ? 1.42 : 1.22) - post.sat) * (1 - Math.exp(-1.6 * dt));
+  // (painting the other one out brings the colour back, a third at a time)
+  const mono = grey ? 1 : gallery.bleak ? 1 - gallery.unpainted / 3 : 0, bright = game.won ? 1.42 : 1.22;
+  if (game.state !== 'finale') post.sat += (bright + (0.03 - bright) * mono - post.sat) * (1 - Math.exp(-1.6 * dt));
   post.keepRed = gallery.ended ? 1 : 0;
   day.set(game.day, hung ? hung.name : paper ? 'paper' : null, hung ? hung.at : game.dawn);
   if (gallery.dark) { post.tint.setScalar(0.03); game.wasDark = true; }           // the grey room blinks: black, for a moment
@@ -1366,13 +1390,13 @@ function tick(dt) {
   for (const s of sparks) if (!s.taken) s.update(time, dt);
   drops.update(time);
   swings.update(dt);
-  for (const ev of garden.update(dt, time, game.state === 'play' && !gallery.ended ? player : null)) bloomEvent(ev);
-  if (gallery.ended && game.state === 'play') garden.wilt(player.pos, 6);
+  for (const ev of garden.update(dt, time, game.state === 'play' && !gallery.bleak ? player : null)) bloomEvent(ev);
+  if (gallery.bleak && game.state === 'play') garden.wilt(player.pos, 6);
   painter.update(dt);
   vistas.update(time);
   secrets.update(time);
   interior.update(time);
-  interior.deface(gallery.ended);
+  interior.deface(gallery.bleak);
   for (const ev of seedbed.update(dt, time, game.state === 'title' ? null : player)) {
     if (ev.type === 'fleck') fx.emit(tmp.set(ev.x, ev.y, ev.z), 0, ev.fast ? 6 : 3.4, 0, Math.random() < 0.5 ? '#ffc070' : '#ffe6b0', 0.2, ev.fast ? 2.4 : 1.9, 0, 1.4);
     else if (ev.type === 'grown') { sound.play('vista'); hud.toast('The vine has grown', 'A way where there was none', 3600); cheerAll(); saveSoon(); }

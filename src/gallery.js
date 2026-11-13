@@ -42,6 +42,11 @@ import { ghostMaterial } from './sketches.js';
 // home. The portrait is different every time it is come back to. The muse weeps. Somebody in the painter's colours
 // is seen, far off, in the first painting, and is never there on arrival.
 //
+// There are two ways for it to end, and both are made with Cream, the one paint left: it takes paint back to paper.
+// The painter can go to their own portrait and paint it out, and then there was never a painter: the journey is
+// gone for good. Or they can follow the blood home. The other one is in the atelier, painting in the painter's
+// colours, with its back to the door; painted out, it gives back what it took, and the colour comes home.
+//
 // It does not come from nowhere. Each time something is lifted the music loses a layer; the dust sheet over that
 // picture hangs a little lower every time the painter comes back into the room; and the game counts the lifts.
 // (It all lives far to the east of everything else, in the same scene.)
@@ -207,6 +212,9 @@ export class Gallery {
   /** `atelier` is the middle of the Spire's hall: once the gallery has been found, a frame stands there that leads back to it. */
   constructor(scene, world, uTime, lastpage, atelier) {
     this.scene = scene; this.world = world; this.lastpage = lastpage; this.found = false;
+    this.wiped = 0; this.unpainted = 0; this.undone = false;      // how much of the portrait, and of the other painter, has been painted out
+    this.indoors = false;                                   // (the game says) in the Spire's atelier
+    this.homeSpot = new V3(atelier.x, atelier.y, atelier.z - 8.5);
     this.after = 0;                                         // how often the gallery has been come back to since the portrait
     this.outdoors = false; this.sightT = 12;                // (the game says) out in the first painting; and how long until somebody is seen there
     this.beatT = 0; this.holdT = 0; this.scared = false; this.crawled = false;
@@ -561,11 +569,45 @@ export class Gallery {
     return null;
   }
 
-  /** Stepping into the empty frame: the painter is the portrait now. Sets up the last look at the room. */
-  frameIn() {
-    this.grey = false; this.ended = true;
+  /** After the portrait, and until the other painter is painted out: the world has no colour, and nothing is as it was. */
+  get bleak() { return this.ended && !this.undone; }
+
+  /** A long look at the big frame, with nobody to move: `erase` if what follows is nothing at all. */
+  lookAtFrame(erase = false) {
     const n = new V3(HALL.x - this.empty.x, 0, HALL.z - this.empty.z).normalize();
-    this.ending = { t: 0, cam: this.empty.clone().addScaledVector(n, 13).setY(HALL.y + 4.4), look: this.empty.clone().setY(HALL.y + 4.3), dir: n.clone().negate() };
+    this.ending = { t: 0, erase, cam: this.empty.clone().addScaledVector(n, 13).setY(HALL.y + 4.4), look: this.empty.clone().setY(HALL.y + 4.3), dir: n.clone().negate() };
+  }
+  /** Stepping into the empty frame: the painter is the portrait now. */
+  frameIn() { this.grey = false; this.ended = true; this.lookAtFrame(); }
+
+  /** A swing of the brush landing at (x, z), from a painter standing at `p`. Only Cream does anything here, and only at the end. */
+  strike(x, z, p, hex) {
+    const out = [];
+    if (!this.bleak || this.ending || hex !== PAINTS[4].hex) return out;
+    const hit = (q, reach) => Math.abs(q.y - p.y) < 4 && ((q.x - x) ** 2 + (q.z - z) ** 2 < reach * reach || (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < 9);
+    // the painter's own portrait: three strokes, and there is no painter
+    if (this.where(p) === 'hall' && hit(this.empty, 4.4) && this.wiped < 3) {
+      if (!this.selfCv) {
+        this.selfCv = document.createElement('canvas'); this.selfCv.width = 256; this.selfCv.height = 320;
+        this.selfCv.getContext('2d').drawImage(this.portraits[Math.min(3, this.after)].image, 0, 0);
+        this.selfTex = new THREE.CanvasTexture(this.selfCv); this.selfTex.colorSpace = THREE.SRGBColorSpace;
+      }
+      this.wiped++;
+      const c = this.selfCv.getContext('2d');
+      if (this.wiped >= 3) { c.fillStyle = '#f1ece2'; c.fillRect(0, 0, 256, 320); }
+      else for (let i = 0; i < 70; i++) drawStroke(c, Math.random() * 256, Math.random() * 320, (Math.random() - 0.5) * 0.8, 40 + Math.random() * 70, 16 + Math.random() * 16, ['#f1ece2', '#ebe5da', '#f8f4ec'][i % 3], 'rgba(255,255,255,0.3)', 'rgba(0,0,0,0.05)');
+      this.selfTex.needsUpdate = true;
+      if (this.wiped >= 3) this.lookAtFrame(true);
+      out.push({ type: this.wiped >= 3 ? 'erased' : 'wipe', n: this.wiped, at: new V3(this.empty.x, this.empty.y + 3.5, this.empty.z) });
+    }
+    // the other painter, at home: three strokes, and everything it took comes back
+    if (this.indoors && this.other.root.visible && hit(this.homeSpot, 3.8) && this.unpainted < 3) {
+      this.unpainted++;
+      this.taken = Math.round(this.total * (1 - this.unpainted / 3));
+      if (this.unpainted >= 3) this.undone = true;
+      out.push({ type: this.undone ? 'undone' : 'unpaint', n: this.unpainted, at: new V3(this.homeSpot.x, this.homeSpot.y + 1.4, this.homeSpot.z) });
+    }
+    return out;
   }
 
   /** Lift or lay, as `near` offered. Returns what happened, and the name of a picture this has just finished. */
@@ -592,8 +634,8 @@ export class Gallery {
       if (this.hung.some((h) => h.at.distanceTo(p) < 6)) return { key: 'someone', line: 'There is someone in it.' };
       return null;
     }
-    if (w === 'hall' && this.ended) return this.empty.distanceTo(p) < 7 ? { key: 'portrait', line: 'A portrait of a painter, in pencil. It was never finished.' } : { key: 'colours', line: 'Thank you for the colours.' };
-    if (w === 'summer' && this.ended) return p.distanceTo(this.summer.npcAt) < 10 ? { key: 'danced', line: 'They danced for a long time.' } : null;
+    if (w === 'hall' && this.bleak) return this.empty.distanceTo(p) < 7 ? { key: 'portrait', line: 'A portrait of a painter, in pencil. Cream takes paint back to paper.' } : { key: 'colours', line: 'Thank you for the colours.' };
+    if (w === 'summer' && this.bleak) return p.distanceTo(this.summer.npcAt) < 10 ? { key: 'danced', line: 'They danced for a long time.' } : null;
     if (w === 'hall') {
       if (this.slipped && this.odd.at.distanceTo(p) < 7) return { key: 'odd', line: 'A painting of this room. Whoever is in it is standing where you are.' };
       if (this.draped.some((q) => q.distanceTo(p) < 4.6)) return { key: 'draped', line: 'Still under its dust sheet. It has not been hung yet.' };
@@ -608,7 +650,7 @@ export class Gallery {
     return null;
   }
 
-  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, joined: this.joined ? 1 : 0, after: Math.min(this.after, 9), crawled: this.crawled ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
+  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, joined: this.joined ? 1 : 0, unpainted: this.unpainted, undone: this.undone ? 1 : 0, after: Math.min(this.after, 9), crawled: this.crawled ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
   load(d) {
     if (!d) return;
     this.slipped = !!d.slipped; this.ended = this.slipped && !!d.ended; this.grey = this.slipped && !!d.grey && !this.ended;
@@ -616,6 +658,8 @@ export class Gallery {
     this.whole = this.ended || (this.slipped && !!d.whole);
     if (this.whole) this.wholeT = 99;
     this.joined = !!d.joined; this.crawled = !!d.crawled;
+    this.undone = this.ended && !!d.undone; this.unpainted = this.undone ? 3 : this.ended && [1, 2].includes(d.unpainted) ? d.unpainted : 0;
+    if (this.undone) this.taken = 0;
     this.after = Number.isInteger(d.after) && d.after > 0 && this.ended ? d.after : 0;
     this.lifts = Number.isInteger(d.lifts) && d.lifts > 0 ? d.lifts : 0; this.visits = Number.isInteger(d.visits) && d.visits > 0 ? d.visits : 0;
     const F = this.flood, S = this.summer, level = [0, 1, 2].includes(d.level) ? d.level : 2, wet = S.spots.map((_, i) => !!(d.wet && d.wet[i]));
@@ -635,7 +679,7 @@ export class Gallery {
     O.on.visible = !this.slipped; O.off.visible = this.slipped;
     // every time the room is come back to, the sheet hangs a little lower and a little to one side
     if (inHall && !this._inHall) {
-      this.visits++; if (this.ended) this.after++;
+      this.visits++; if (this.bleak && !this.wiped) this.after++;
       const k = Math.min(3, this.visits - 1), side = k ? (this.visits % 2 ? 0.12 : -0.12) : 0;
       O.on.position.set(O.right.x * side, -0.18 * k, O.right.z * side);
     }
@@ -727,7 +771,14 @@ export class Gallery {
           }
         }
       }
-    } else if (this.ended && this.outdoors && player) {
+    } else if (this.bleak && this.indoors && player) {
+      // it went home. It is in the atelier, painting, with its back to the door; struck, it turns round
+      const at = T.at;
+      at.copy(this.homeSpot); T.root.position.copy(at); T.root.visible = true;
+      const want = this.unpainted ? Math.atan2(player.pos.x - at.x, player.pos.z - at.z) : Math.PI;
+      T.root.rotation.y += Math.atan2(Math.sin(want - T.root.rotation.y), Math.cos(want - T.root.rotation.y)) * ease(2.5);
+      if (player.pos.distanceTo(at) < 9) ev.push({ type: 'say', key: 'home', line: 'It is painting, in your colours. All you have is Cream.' });
+    } else if (this.bleak && this.outdoors && player) {
       // somebody in the painter's colours, a long way off, with their back turned. Never there on arrival
       const p = player.pos, at = T.at, d = T.root.visible ? Math.hypot(p.x - at.x, p.z - at.z) : 0;
       this.sightT -= dt;
@@ -742,10 +793,10 @@ export class Gallery {
       }
     } else T.root.visible = false;
     // what it takes, it is painted with; what the painter loses leaves them an outline
-    const f = this.whole ? 1 : Math.min(1, this.taken / this.total), kT = Math.round((1 - f) * T.parts.length);
+    const f = (this.whole ? 1 : Math.min(1, this.taken / this.total)) * (1 - this.unpainted / 3), kT = Math.round((1 - f) * T.parts.length);
     if (kT !== T.k) { T.k = kT; dress(T.parts, this.shade, kT, false); }
 
-    this.framePic.visible = this.ended; this.framePic.material.map = this.portraits[Math.min(3, this.after)];
+    this.framePic.visible = this.bleak; this.framePic.material.map = this.wiped ? this.selfTex : this.portraits[Math.min(3, this.after)];
     this.frameGlow.material.opacity += ((this.whole && this.wholeT > 3.5 && !this.ended ? 0.55 : 0) - this.frameGlow.material.opacity) * ease(1.5);
     if (this.ending) this.ending.t += dt;
     const gone = this.grey && inHall;
@@ -759,7 +810,7 @@ export class Gallery {
       h.pic.material.map = gone ? h.greys[h.stage] : h.tex;
     }
     this.trail.visible = this.ended;
-    for (const m of this.tears) m.visible = this.ended;
+    for (const m of this.tears) m.visible = this.bleak;
     // High Summer: the piper plays, and the companions go to the piper and stay. Afterwards, this is where they are
     {
       const P = S.piper, here = !!player && this.where(player.pos) === 'summer', dist = player ? player.pos.distanceTo(S.npcAt) : 99;
@@ -802,7 +853,7 @@ export class Gallery {
     if (this.ended && player && this.where(player.pos) === 'summer') {
       const dist = player.pos.distanceTo(S.npcAt), C = S.crawl, b = C.b;
       // the tune is still here, running down, until the painter is close enough to see why
-      if (dist > 6.5 && dist < 26) { S.noteT -= dt; if (S.noteT <= 0) { S.noteT = 0.5 + Math.random() * 0.4; ev.push({ type: 'dirge', i: S.note++ }); } }
+      if (this.bleak && dist > 6.5 && dist < 26) { S.noteT -= dt; if (S.noteT <= 0) { S.noteT = 0.5 + Math.random() * 0.4; ev.push({ type: 'dirge', i: S.note++ }); } }
       // one of them is not quite dead. It tries to come to the painter, and does not get there
       if (b && C.state !== 'done') {
         const q = b.g.position, dx = player.pos.x - q.x, dz = player.pos.z - q.z, d = Math.hypot(dx, dz) || 1;
