@@ -253,6 +253,8 @@ export class Blot {
   }
 
   update(dt, t, player) {
+    if (this.dead) return null;                      // it does not get up again
+    if (this.host) player = this.host;               // it has taken up with somebody else
     const p = this.g.position;
     if (!this.awake) {
       const br = 1 + Math.sin(t * 1.3 + this.ph) * 0.06;

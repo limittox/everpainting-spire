@@ -24,11 +24,18 @@ import { ghostMaterial } from './sketches.js';
 // Stepping into it leads to the same room with the colour gone out of it, the companions nowhere, every other
 // frame shut, and somebody in each of the pictures. From here on the game is not the gentle one it began as.
 //
-// Somebody is standing at the far end of that room: a painter like this one, sketched and never painted. It does not
-// move and it cannot be failed against. It does what the painter has learned to do: it lifts. With every few steps
-// the painter takes, one paint leaves their palette, one more part of them is only an outline, and one more part of
-// the other is painted in; and the colour comes back into the room. When there is only Cream left it goes home in
+// Somebody is in that room: a painter like this one, drawn and never painted. It only moves when it is not being
+// looked at: while the painter's back is turned, and in the moments when the room goes dark. It does what the
+// painter has learned to do: it lifts. Each time it reaches the painter one paint leaves their palette (two, later
+// on), one more part of them is only an outline, one more part of the other is painted in, and the colour comes
+// back into the room; then it is gone, and comes again from behind. Nothing is failed and nobody dies. When there is only Cream left it goes home in
 // the painter's place. The one frame that opens after that is the empty one, and what hangs in it then is a portrait.
+//
+// From the moment the painter steps into that picture there is no colour anywhere, and after the portrait there never
+// is again: the painter is left with Cream, which is blank, in a world in black and white.
+//
+// And the companions. A piper lives in High Summer, and is glad of company: the companions go to the piper, dance,
+// and do not come away again. That is the happiest place in the game. Afterwards it is where they are found.
 //
 // It does not come from nowhere. Each time something is lifted the music loses a layer; the dust sheet over that
 // picture hangs a little lower every time the painter comes back into the room; and the game counts the lifts.
@@ -198,10 +205,14 @@ export class Gallery {
     this.slipped = false; this.grey = false; this.hung = [];
     this.ghost = ghostMaterial(uTime);
     this.shade = new THREE.MeshBasicMaterial({ color: 0x14121a, fog: false });       // the other painter, where it has not been painted yet: a dark shape
+    this.gaze = new V3(0, 0, -1);                                                     // and which way it is looking
+    this.away = 0; this.unseen = 0; this.blinkT = 7; this.blink = 0; this.stepT = 0; this.moved = false;
+    this.close = 0; this.dark = 0;                                                    // for the game: how near it is (0..1), and whether the room is dark this frame
     this.eye = new V3();                                                              // where the camera is (the game says), so it can stand where it will be seen
     this.taken = 0; this.total = 7;          // paints lifted off the painter so far, out of how many they had (the game says)
     this.walk = 0; this.greyT = 0; this.whole = false; this.wholeT = 0; this.ended = false; this.ending = null;
-    this.mine = null; this.events = []; this._last = new V3();
+    this.events = []; this._last = new V3();
+    this.joined = false;                                    // the companions have gone to the piper
     this.lifts = 0; this.visits = 0; this._inHall = false;          // how often something has been lifted; how often the room has been come back to
     const bag = new Bag(), add = (g, pal, o) => bag.add(daub(g, pal, o)), r = mulberry32(5521);
     const island = (def, tex, rock) => {
@@ -352,6 +363,7 @@ export class Gallery {
     {
       const S = (this.summer = { wetK: [0, 0] });
       const sp = (a, rad) => { const x = SUMMER.x + Math.cos(a) * rad, z = SUMMER.z + Math.sin(a) * rad; return new V3(x, surfY(SUMMER, x, z), z); };
+      const npcAt = sp(3.4, 6.5);
       const springAt = sp(1.95, 12), pondAt = sp(-1.35, 13), rimA = 0.4, rimAt = sp(rimA, rimR(SUMMER, rimA) + 0.2);
       const bed = new THREE.CatmullRomCurve3([springAt, sp(1.6, 11), sp(1.2, 12.5), sp(0.8, 16), sp(0.5, 21), rimAt]).getSpacedPoints(60);
       bed.forEach((p) => { p.y = surfY(SUMMER, p.x, p.z) + 0.1; });
@@ -404,12 +416,41 @@ export class Gallery {
       scene.add(wheel);
       S.wheel = wheel; S.spin = 0;
 
+      // somebody who lives in this picture: a piper in a straw hat, who is glad of company
+      {
+        const flat = (c) => new THREE.MeshLambertMaterial({ color: c, emissive: new THREE.Color(c).multiplyScalar(0.18), flatShading: true });
+        const piper = new THREE.Group(), part = (g, c, x, y, z) => { const m = new THREE.Mesh(g, flat(c)); m.position.set(x, y, z); piper.add(m); return m; };
+        part(new THREE.ConeGeometry(0.72, 1.5, 9), 0x3fa7a0, 0, 0.95, 0);
+        part(new THREE.IcosahedronGeometry(0.36, 1), 0xf0c9a0, 0, 1.95, 0);
+        part(new THREE.CylinderGeometry(0.8, 0.86, 0.07, 14), 0xe8c46a, 0, 2.2, 0);
+        part(new THREE.ConeGeometry(0.42, 0.5, 10), 0xe8c46a, 0, 2.46, 0);
+        part(new THREE.CylinderGeometry(0.035, 0.035, 0.8, 5).rotateX(Math.PI / 2), 0x6a4a2a, 0.12, 1.86, 0.55);
+        for (const s of [-1, 1]) part(new THREE.BoxGeometry(0.22, 0.2, 0.36), 0x5a3a2a, s * 0.22, 0.1, 0.06);
+        piper.position.copy(npcAt);
+        scene.add(piper);
+        S.piper = piper; S.npcAt = npcAt; S.noteT = 0; S.note = 0;
+        // the point the companions chase round the piper: a ring dance
+        S.lead = { pos: new V3(), heading: 0, seat: null, grounded: true, lift: null, ride: null, gliding: false, vel: new V3() };
+        // and what is found here afterwards: where each of them lies
+        const blood = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.0, 0.012), fog: false });
+        S.lie = [[2.2, 0.6], [-1.6, 2.1], [0.4, -2.6], [-2.8, -1.0], [3.1, -1.9], [-0.6, 3.6]].map(([ox, oz], i) => {
+          const x = npcAt.x + ox, z = npcAt.z + oz, y = surfY(SUMMER, x, z), pool = new THREE.Group();
+          for (const [dx, dz, rad, sq] of [[0, 0, 1.25, 0.72], [0.9, 0.5, 0.5, 1], [-0.7, 0.9, 0.34, 1], [1.5, -0.3, 0.2, 1]]) {
+            const m = new THREE.Mesh(new THREE.CircleGeometry(rad, 18).rotateX(-Math.PI / 2), blood);
+            m.position.set(dx, 0.05 + 0.004 * i, dz); m.scale.set(1, 1, sq); m.rotation.y = i * 1.7; pool.add(m);
+          }
+          pool.position.set(x, y, z); pool.rotation.y = i * 2.3; pool.visible = false; pool.renderOrder = 1;
+          scene.add(pool);
+          return { pos: new V3(x, y, z), pool, turn: i * 1.9 };
+        });
+      }
+
       // wheat: the south field drinks from the stream, the north field from the pond
       const fields = [new Bag(), new Bag()], sAt = this.sAt;
       for (let i = 0; i < 620; i++) {
         const a = r() * TAU, d = 2 + Math.sqrt(r()) * 20.5, x = SUMMER.x + Math.cos(a) * d, z = SUMMER.z + Math.sin(a) * d, y = surfY(SUMMER, x, z);
         const near = (q, rad) => (q.x - x) ** 2 + (q.z - z) ** 2 < rad * rad;
-        if (near(springAt, 3) || near(pondAt, 5.6) || near(hut, 3.4) || near(sAt, 7) || bed.some((q, k) => k % 2 === 0 && near(q, 1.5))) continue;
+        if (near(springAt, 3) || near(pondAt, 5.6) || near(hut, 3.4) || near(sAt, 7) || near(npcAt, 5.5) || bed.some((q, k) => k % 2 === 0 && near(q, 1.5))) continue;
         for (let k = 0; k < 3; k++) {
           const h = 1.0 + r() * 0.6;
           fields[z > SUMMER.z - 3 ? 0 : 1].add(daub(place(new THREE.ConeGeometry(0.075, h, 4, 1), x + (r() - 0.5) * 0.5, y + h / 2, z + (r() - 0.5) * 0.5, (r() - 0.5) * 0.3, r() * 3, (r() - 0.5) * 0.3), ['#ffffff', '#f4f0e4', '#e8e2d2'], { scale: 0.8, spread: 1 }));
@@ -522,13 +563,14 @@ export class Gallery {
     return null;
   }
 
-  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
+  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, joined: this.joined ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
   load(d) {
     if (!d) return;
     this.slipped = !!d.slipped; this.ended = this.slipped && !!d.ended; this.grey = this.slipped && !!d.grey && !this.ended;
     this.taken = Number.isInteger(d.taken) && d.taken > 0 && this.slipped ? Math.min(d.taken, PAINTS.length) : 0;
     this.whole = this.ended || (this.slipped && !!d.whole);
     if (this.whole) this.wholeT = 99;
+    this.joined = !!d.joined;
     this.lifts = Number.isInteger(d.lifts) && d.lifts > 0 ? d.lifts : 0; this.visits = Number.isInteger(d.visits) && d.visits > 0 ? d.visits : 0;
     const F = this.flood, S = this.summer, level = [0, 1, 2].includes(d.level) ? d.level : 2, wet = S.spots.map((_, i) => !!(d.wet && d.wet[i]));
     const held = 2 - level - wet.filter(Boolean).length;          // there are two brushfuls in all: any that is nowhere is on the brush
@@ -537,13 +579,6 @@ export class Gallery {
     S.spots.forEach((s, i) => { s.wet = wet[i]; S.wetK[i] = wet[i] ? 1 : 0; });
     S.stream.reach = S.fall.reach = wet[0] ? 1 : 0;
     this.carry = held ? 'water' : null;
-  }
-
-  /** The painter is an outline as far up as their paints have been taken: on the title screen too, afterwards. */
-  wear(player) {
-    if (!this.mine) this.mine = { parts: partsOf([player.model.root, player.cape.mesh], [player.model.tip, player.model.backTip, player.model.easelTip]), k: 0 };
-    const k = Math.round((this.whole ? 1 : Math.min(1, this.taken / this.total)) * this.mine.parts.length);
-    if (k !== this.mine.k) { this.mine.k = k; dress(this.mine.parts, this.ghost, k, true); }
   }
 
   update(dt, t, player, blots = null) {
@@ -571,38 +606,74 @@ export class Gallery {
         O.tex.needsUpdate = true;
       }
     }
-    // the grey room: someone at the far end, who takes a paint for every few steps the painter walks
+    // the grey room, and who is in it
     const ev = this.events, T = this.other, was = T.root.visible;
     ev.length = 0;
+    this.close = 0; this.dark = 0;
     if (this.grey && player) {
+      const p = player.pos, at = T.at;
       this.greyT += dt;
-      if (!this.whole && this.greyT > 5) {
-        this.walk += Math.min(1, Math.hypot(player.pos.x - this._last.x, player.pos.z - this._last.z));
-        if (this.walk > 4.5) {
-          this.walk = 0; this.taken++;
-          if (this.taken >= this.total) { this.whole = true; this.wholeT = 0; }
-          ev.push({ type: 'take', n: this.taken, last: this.whole, at: T.at });
-        }
-      } else if (this.whole) {
-        const before = this.wholeT; this.wholeT += dt;
-        if (before <= 3.5 && this.wholeT > 3.5) ev.push({ type: 'gone', at: T.at });
-      }
-      T.root.visible = this.greyT > 5 && !(this.whole && this.wholeT > 3.5);
-      if (T.root.visible && !was) {
-        // it is simply there, in front of the painter, in the middle of whatever they were looking at
-        const p = player.pos, fx = p.x - this.eye.x, fz = p.z - this.eye.z, fl = Math.hypot(fx, fz) || 1;
-        let x = p.x + (fx / fl) * 9 - HALL.x, z = p.z + (fz / fl) * 9 - HALL.z, d = Math.hypot(x, z) || 1;
-        const lim = d > 12.5 ? 12.5 : d < 3.6 ? 3.6 : d;                        // inside the room, and not on the bench
+      /** Stand `far` from the painter in the direction (dx, dz): inside the room, off the bench, facing them. */
+      const place = (dx, dz, far) => {
+        const l = Math.hypot(dx, dz) || 1;
+        let x = p.x + (dx / l) * far - HALL.x, z = p.z + (dz / l) * far - HALL.z;
+        const d = Math.hypot(x, z) || 1, lim = d > 13 ? 13 : d < 3.6 ? 3.6 : d;
         x *= lim / d; z *= lim / d;
-        T.at.set(HALL.x + x, surfY(HALL, HALL.x + x, HALL.z + z), HALL.z + z);
-        T.root.position.copy(T.at); T.root.rotation.y = Math.atan2(p.x - T.at.x, p.z - T.at.z);
+        at.set(HALL.x + x, surfY(HALL, HALL.x + x, HALL.z + z), HALL.z + z);
+        T.root.position.copy(at); T.root.rotation.y = Math.atan2(p.x - at.x, p.z - at.z);
+        return Math.hypot(p.x - at.x, p.z - at.z);
+      };
+      if (this.whole) {
+        // it has everything: it turns to the way home, and is gone
+        const before = this.wholeT; this.wholeT += dt;
+        if (before <= 3.5 && this.wholeT > 3.5) ev.push({ type: 'gone', at });
+        T.root.visible = this.wholeT <= 3.5;
+        const want = Math.atan2(this.backAt.x - at.x, this.backAt.z - at.z);
+        T.root.rotation.y += Math.atan2(Math.sin(want - T.root.rotation.y), Math.cos(want - T.root.rotation.y)) * ease(1.4);
+      } else if (this.greyT <= 5) T.root.visible = false;
+      else if (this.away > 0) {
+        // it has just taken something: nowhere at all for a while, and then behind the painter
+        this.away -= dt; T.root.visible = false;
+        if (this.away <= 0) {
+          // (behind and to one side of the view, so that it comes in at the edge of the picture and not through the camera)
+          // whichever side has more room (near a wall, one side has none)
+          const a = 1.9 + Math.random() * 0.5, c = Math.cos(a), s = Math.sin(a), g = this.gaze;
+          const left = place(g.x * c - g.z * s, g.x * s + g.z * c, 11), right = place(g.x * c + g.z * s, -g.x * s + g.z * c, 11);
+          if (left > right) place(g.x * c - g.z * s, g.x * s + g.z * c, 11);
+          T.root.visible = true; this.unseen = 0; this.stepT = 0;
+        }
+      } else if (!was) { place(this.gaze.x, this.gaze.z, 9); T.root.visible = true; this.blinkT = 7; this.unseen = 0; }      // the first time: simply there, in the middle of the view
+      else {
+        const dx = p.x - at.x, dz = p.z - at.z, d = Math.hypot(dx, dz) || 1;
+        // is it being looked at? (in front of the camera, within the width of the view)
+        const ex = at.x - this.eye.x, ez = at.z - this.eye.z, el = Math.hypot(ex, ez) || 1;
+        const seen = (ex * this.gaze.x + ez * this.gaze.z) / el > 0.72;
+        // every so often the room goes dark for a moment; more often, the more it has taken
+        this.blinkT -= dt;
+        if (this.blinkT <= 0) { this.blinkT = 4.5 + Math.random() * 4 - 2.5 * (this.taken / this.total); this.blink = 0.3; ev.push({ type: 'blink' }); }
+        const dark = this.blink > 0;
+        if (dark) { this.blink -= dt; this.dark = 1; }
+        this.unseen = seen && !dark ? 0 : this.unseen + dt;
+        const near = clamp(1 - d / 16, 0, 1);
+        if ((!seen || dark) && d > 1.3) {
+          // unwatched, it comes: faster the longer it is left unwatched, and very fast in the dark
+          const step = Math.min(d - 1.2, (dark ? 15 : Math.min(20, 6.5 + 3 * this.unseen)) * dt);
+          at.x += (dx / d) * step; at.z += (dz / d) * step;
+          const c = Math.hypot(at.x - HALL.x, at.z - HALL.z);
+          if (c < 3.3 && c > 0.01) { at.x = HALL.x + ((at.x - HALL.x) / c) * 3.3; at.z = HALL.z + ((at.z - HALL.z) / c) * 3.3; }      // round the bench, not through it
+          at.y = surfY(HALL, at.x, at.z);
+          T.root.position.copy(at); T.root.rotation.y = Math.atan2(dx, dz);
+          if (!dark) { this.moved = true; this.stepT -= dt; if (this.stepT <= 0) { this.stepT = 0.36; ev.push({ type: 'tread', near }); } }
+        } else if (this.moved && seen) { this.moved = false; ev.push({ type: 'tread', near, late: true }); }      // caught moving: one more step lands, a beat late
+        this.close = clamp(1 - (d - 2) / 7, 0, 1);
+        if (d < 1.7) {
+          // it has reached the painter: one paint (two, once it has a few), and it is gone
+          const n = Math.min(this.total - this.taken, this.taken >= 2 ? 2 : 1);
+          for (let i = 0; i < n; i++) { this.taken++; ev.push({ type: 'take', n: this.taken, last: this.taken >= this.total, at, touch: i === 0 }); }
+          if (this.taken >= this.total) { this.whole = true; this.wholeT = 0; } else { this.away = 2.5 + Math.random() * 2; T.root.visible = false; this.moved = false; }
+        }
       }
-      // it watches the painter until it has everything; then it turns to the way home
-      const to = this.whole ? this.backAt : player.pos, want = Math.atan2(to.x - T.at.x, to.z - T.at.z);
-      T.root.rotation.y += Math.atan2(Math.sin(want - T.root.rotation.y), Math.cos(want - T.root.rotation.y)) * ease(this.whole ? 1.4 : 4);
     } else T.root.visible = false;
-    if (T.root.visible && !was) ev.push({ type: 'appear', at: T.at });
-    if (player) this._last.copy(player.pos);
     // what it takes, it is painted with; what the painter loses leaves them an outline
     const f = this.whole ? 1 : Math.min(1, this.taken / this.total), kT = Math.round((1 - f) * T.parts.length);
     if (kT !== T.k) { T.k = kT; dress(T.parts, this.shade, kT, false); }
@@ -612,9 +683,46 @@ export class Gallery {
     if (this.ending) this.ending.t += dt;
     const gone = this.grey && inHall;
     for (const h of this.hung) h.pic.material.map = gone ? h.grey : h.tex;
+    // High Summer: the piper plays, and the companions go to the piper and stay. Afterwards, this is where they are
+    {
+      const P = S.piper, here = !!player && this.where(player.pos) === 'summer', dist = player ? player.pos.distanceTo(S.npcAt) : 99;
+      P.visible = !this.ended;
+      if (!this.ended) {
+        // a little dance: a bob, a sway, a turn toward whoever has come
+        P.position.y = S.npcAt.y + Math.abs(Math.sin(t * 5.2)) * 0.22;
+        P.rotation.z = Math.sin(t * 2.6) * 0.14;
+        const want = here && dist < 14 ? Math.atan2(player.pos.x - S.npcAt.x, player.pos.z - S.npcAt.z) : Math.sin(t * 0.7) * 1.2;
+        P.rotation.y += Math.atan2(Math.sin(want - P.rotation.y), Math.cos(want - P.rotation.y)) * ease(3);
+        if (here && dist < 22) { S.noteT -= dt; if (S.noteT <= 0) { S.noteT = 0.24; ev.push({ type: 'note', i: S.note++, near: clamp(1.2 - dist / 20, 0.25, 1) }); } }
+        if (here && dist < 5.5 && !this.joined && blots && blots.some((b) => b.awake)) { this.joined = true; ev.push({ type: 'join', at: S.npcAt }); }
+        // the ring they dance in
+        const a = t * 1.25;
+        S.lead.pos.set(S.npcAt.x + Math.cos(a) * 2.3, S.npcAt.y, S.npcAt.z + Math.sin(a) * 2.3);
+        S.lead.vel.set(-Math.sin(a) * 2.9, 0, Math.cos(a) * 2.9); S.lead.heading = Math.atan2(S.lead.vel.x, S.lead.vel.z);
+      }
+      if (blots) {
+        let n = 0;
+        for (const b of blots) {
+          if (!b.awake) continue;
+          const spot = S.lie[n++ % S.lie.length];
+          if (this.ended) {
+            // nobody is dancing now
+            if (!b.dead) {
+              b.dead = true; b.host = null; b.g.visible = true;
+              b.g.position.copy(spot.pos); b.g.rotation.set(0, spot.turn, 1.42);
+              b.body.scale.set(1.12, 0.62, 1.12); b.eyes.forEach((e) => e.scale.set(1.2, 0.1, 1));
+              spot.pool.visible = true;
+            }
+          } else if (this.joined) {
+            if (!b.host) { b.host = S.lead; b.g.visible = true; if (b.g.position.distanceTo(S.npcAt) > 40) b.g.position.set(spot.pos.x, spot.pos.y + 1, spot.pos.z); }
+            if (here && Math.random() < dt * 0.7) b.hop(0, Math.random() < 0.25);
+          }
+        }
+      }
+    }
     // the companions will not go near that picture, and they do not come through it
     if (blots) for (const b of blots) {
-      if (!b.awake) continue;
+      if (!b.awake || b.host || b.dead) continue;
       b.g.visible = !gone;
       const q = b.g.position, dx = q.x - O.at.x, dz = q.z - O.at.z, d = Math.hypot(dx, dz);
       if (this.slipped && d < 8 && d > 0.01) { const push = (8 - d) * ease(6); q.x += (dx / d) * push; q.z += (dz / d) * push; }

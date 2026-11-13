@@ -246,6 +246,32 @@ export class Sound {
     s.start(now); s.stop(now + dur + 0.05);
   }
 
+  /** One note of the piper's jig. */
+  jig(i) {
+    if (!this.ctx) return;
+    const scale = [587.33, 659.25, 739.99, 880, 987.77, 1174.66, 1318.5, 1479.98], tune = [0, 2, 4, 2, 5, 4, 2, 0, 1, 2, 4, 5, 7, 5, 4, 2];
+    this.bell(scale[tune[i % tune.length]], this.ctx.currentTime, 0.075, 0.55);
+  }
+  /** Somebody else's footstep: lower and duller than the painter's own. */
+  tread(vol) { this.whoosh(210 + Math.random() * 50, 90, 0.16, vol, 0.8); }
+  /** A soft, heavy knock: something has been taken. */
+  thump() { this.whoosh(160, 38, 0.6, 0.34, 0.6); }
+  /** Something breathing close by: `k` is how close it is, 0..1. */
+  breath(k) {
+    if (!this.ctx || (k === 0 && !this.breathGain)) return;
+    if (!this.breathGain) {
+      const ctx = this.ctx, s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), swell = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain();
+      s.buffer = this.noise; s.loop = true;
+      bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 0.9;
+      swell.gain.value = 0.5; lfo.frequency.value = 0.32; depth.gain.value = 0.5;
+      lfo.connect(depth); depth.connect(swell.gain);          // in, and out
+      this.breathGain = ctx.createGain(); this.breathGain.gain.value = 0;
+      s.connect(bp); bp.connect(swell); swell.connect(this.breathGain); this.breathGain.connect(this.master);
+      s.start(); lfo.start();
+    }
+    this.breathGain.gain.setTargetAtTime(k * 0.16, this.ctx.currentTime, 0.4);
+  }
+
   /** Pickups and brush swings climb a pentatonic scale, so wandering plays a little melody. */
   chime(i) {
     if (!this.ctx) return;

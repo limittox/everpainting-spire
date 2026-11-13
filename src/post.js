@@ -113,6 +113,7 @@ uniform float bloom;
 uniform vec2 texel;
 uniform float relief;
 uniform float sat;
+uniform float keepRed;    // 0..1: when the colour is gone, red that is nothing but red keeps its own
 uniform float flash;
 uniform vec3 tint;
 uniform sampler2D tDepth;
@@ -154,7 +155,8 @@ void main() {
     c = mix(c, vec3(0.2, 0.19, 0.25), line * ink * 0.8);
   }
   float l = lum(c);
-  c = mix(vec3(l), c, sat);
+  float red = keepRed * smoothstep(0.80, 0.93, (c.r - max(c.g, c.b)) / max(c.r, 0.001)) * step(0.1, c.r);
+  c = mix(vec3(l), c, mix(sat, 1.3, red));
   c = (c - 0.5) * 1.07 + 0.5;
   vec2 v = vUv - 0.5;
   c *= 1.0 - dot(v, v) * 0.38;                   // vignette
@@ -169,6 +171,7 @@ export class Painterly {
     this.mode = 2; // 0 off, 1 painterly, 2 heavy impasto (the settings decide; this is only what it starts as)
     this.flash = 0;
     this.sat = 1.22;
+    this.keepRed = 0;
     this.bloom = 1;
     this.ink = 0;           // 0..1: pencil outlines over the picture (the Underpainting is drawn, not painted)
     this.sharp = 0;         // 1: things keep their detail with distance (the knife narrows the further off it works)
@@ -190,7 +193,7 @@ export class Painterly {
     this.matFinal = new THREE.ShaderMaterial({
       uniforms: {
         tK: { value: null }, texel: { value: new THREE.Vector2() }, tBloom: { value: null }, bloom: { value: 1 },
-        relief: { value: 1 }, sat: { value: 1.2 }, flash: { value: 0 }, tint: { value: new THREE.Color(1, 1, 1) },
+        relief: { value: 1 }, sat: { value: 1.2 }, keepRed: { value: 0 }, flash: { value: 0 }, tint: { value: new THREE.Color(1, 1, 1) },
         tDepth: { value: null }, clip: { value: new THREE.Vector2(0.3, 2600) }, ink: { value: 0 },
       },
       vertexShader: VERT, fragmentShader: FINAL, depthTest: false, depthWrite: false,
@@ -251,7 +254,7 @@ export class Painterly {
     u.tBloom.value = bA.texture; u.bloom.value = this.bloom;
     u.tK.value = src;
     u.relief.value = this.mode === 0 ? 0.0 : this.mode === 1 ? 1.0 : 1.5;
-    u.sat.value = this.sat;
+    u.sat.value = this.sat; u.keepRed.value = this.keepRed;
     u.tDepth.value = this.rtScene.depthTexture; u.clip.value.set(camera.near, camera.far); u.ink.value = this.ink;
     u.flash.value = this.flash;
     this.quad.material = this.matFinal;

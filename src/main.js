@@ -837,7 +837,7 @@ function findSecret(s) {
 /** Stepping through a door is a cut through white: the painter and their companions are simply somewhere else. */
 function moveTo(p, heading, yaw) {
   player.teleport(p, heading);
-  blots.forEach((b, n) => { if (b.awake) b.g.position.set(p.x + Math.cos(n * 2.1) * 2.2, p.y + 1.2, p.z + Math.sin(n * 2.1) * 2.2); });
+  blots.forEach((b, n) => { if (b.awake && !b.host && !b.dead) b.g.position.set(p.x + Math.cos(n * 2.1) * 2.2, p.y + 1.2, p.z + Math.sin(n * 2.1) * 2.2); });
   game.yaw = yaw; game.pitch = 0.16; game.lookIdle = 0; game.cut = true; game.facing = null;
   post.flash = 1;
   saveSoon();
@@ -1299,12 +1299,27 @@ function tick(dt) {
   game.dawn = game.dawn === undefined ? dawn : game.dawn + (dawn - game.dawn) * (1 - Math.exp(-0.5 * dt));
   gallery.found = !!game.hints.hung;
   gallery.total = Math.max(1, spare().length);
-  gallery.wear(player);
   gallery.eye.copy(camera.position);
-  sound.setThin(gallery.contains(player.pos) && !gallery.ended ? Math.min(3, gallery.lifts) : 0);
+  camera.getWorldDirection(tmp); gallery.gaze.set(tmp.x, 0, tmp.z).normalize();
+  sound.setThin(gallery.ended ? 3 : gallery.contains(player.pos) ? Math.min(3, gallery.lifts) : 0);
   gallery.update(dt, time, game.state === 'title' ? null : player, blots);
   for (const ev of gallery.events) {
-    if (ev.type === 'take') {
+    if (ev.type === 'tread') {
+      // its footsteps: only ever heard while it is not being watched, and once more just after
+      const vol = 0.03 + 0.15 * ev.near;
+      if (ev.late) setTimeout(() => sound.tread(vol), 230); else sound.tread(vol);
+      hint('moves', 'It moves when you cannot see it.', 8000);
+    } else if (ev.type === 'note') { if (settings.values.music > 0) sound.jig(ev.i); }
+    else if (ev.type === 'join') {
+      // the companions have found somebody to dance with, and they are staying
+      fx.burst(tmp.copy(ev.at).setY(ev.at.y + 1.6), 50, { speed: 5, up: 7, colors: ['#ffd060', '#ff8ab0', '#8fdcff', '#fff6e2'], size: 0.4, life: 1.4, gravity: 5 });
+      sound.play('wake');
+      hud.toast('The Piper', 'Somebody to dance with', 4200);
+      hud.hint('Your companions have found someone to dance with. They are staying.', 8000);
+      saveSoon();
+    } else if (ev.type === 'blink') hint('moves', 'It moves when you cannot see it.', 8000);
+    else if (ev.type === 'take') {
+      if (ev.touch) sound.thump();
       // one paint, lifted off the painter and laid on the other
       const lost = PAINTS[spare()[ev.n - 1]];
       fx.burst(tmp.copy(player.pos).setY(player.pos.y + 1.5), 26, { speed: 3, up: 6, colors: [lost.hex, lost.hex, '#ffffff'], size: 0.34, life: 1.1, gravity: 2 });
@@ -1316,17 +1331,21 @@ function tick(dt) {
     } else if (ev.type === 'gone') {
       fx.burst(tmp.copy(ev.at).setY(ev.at.y + 1.3), 40, { speed: 4, up: 5, colors: ['#ffffff', '#fff6e2'], size: 0.36, life: 1.2, gravity: 3 });
       sound.play('wind');
-      blots.forEach((b) => b.setColor('#c4c2c8'));          // and the companions' colours with it
       hud.hint('It has everything now. It has gone home.', 7500);
       saveSoon();
     }
   }
   const hung = gallery.look(camera.position), grey = !!hung && hung.name === 'grey';
-  sound.hush(grey ? 0.08 : 1);
+  sound.hush(grey ? 0 : gallery.ended ? 0.3 : 1);
+  sound.breath(grey ? gallery.close : 0);
+  if (!gallery.dark && game.wasDark) { game.wasDark = false; day.t = -1; }          // (the light comes back: have the day lay its own tint again)
   // the grey room has no colour until the other painter starts taking it from the painter
-  const drained = grey ? 1 - Math.min(1, gallery.taken / gallery.total) : 0, bright = game.won ? 1.42 : 1.22;
-  if (game.state === 'play') post.sat += (bright + (0.04 - bright) * drained - post.sat) * (1 - Math.exp(-1.6 * dt));
+  // there is no colour in the grey room, and after the portrait there is none anywhere, ever: only red that is nothing but red
+  const mono = grey || gallery.ended;
+  if (game.state !== 'finale') post.sat += ((mono ? 0.03 : game.won ? 1.42 : 1.22) - post.sat) * (1 - Math.exp(-1.6 * dt));
+  post.keepRed = gallery.ended ? 1 : 0;
   day.set(game.day, hung ? hung.name : paper ? 'paper' : null, hung ? hung.at : game.dawn);
+  if (gallery.dark) { post.tint.setScalar(0.03); game.wasDark = true; }           // the grey room blinks: black, for a moment
   post.ink += ((paper ? 1 : 0) - post.ink) * (1 - Math.exp(-8 * dt));
   world.sky.position.copy(camera.position);
   sound.flow(game.state === 'play' ? game.flow : 0);
