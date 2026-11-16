@@ -282,6 +282,7 @@ export class Garden {
       if (!Array.isArray(e) || e.length < 7 || !e.every(Number.isFinite)) continue;
       const [kind, x, y, z, rot, s, c] = e, pool = this.sprouts[kind], key = cellKey(x, z);
       if (!pool || this.cells.has(key)) continue;
+      if (!(Math.abs(this.world.groundHeight(x, z, y + 1.5) - y) < 1.6)) continue;      // (the ground it grew on is gone: a level was rebuilt since)
       const item = { x, y, z, rot, tx: (r() - 0.5) * 0.3, tz: (r() - 0.5) * 0.3, s, t: 1, key, kind, c: toHex(c) };
       const old = pool.alloc(item);
       if (old) this.cells.delete(old.key);

@@ -48,6 +48,10 @@
   #toast small { display: block; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold-hi); margin-bottom: 2px; }
   #hint { position: absolute; left: 50%; bottom: 7.5%; transform: translateX(-50%); font-size: 18px; letter-spacing: 0.4px; color: rgba(255, 248, 232, 0.95); text-align: center; white-space: nowrap; opacity: 0; transition: opacity 1.4s; text-shadow: 0 1px 10px rgba(40, 14, 70, 0.9), 0 0 24px rgba(40, 14, 70, 0.55); }
   #hint.on { opacity: 1; }
+  /* instructions, and somebody speaking: a panel that cannot be missed, with the speaker named above the line */
+  #hint.loud { bottom: 9%; width: max-content; max-width: min(820px, 88vw); padding: 11px 26px 13px; white-space: normal; font-size: 21px; line-height: 1.4; color: #fff8e8;
+    background: rgba(30, 20, 62, 0.74); border: 1px solid rgba(233, 195, 106, 0.6); border-radius: 4px; transition: opacity 0.35s; }
+  #hint b.who { display: block; margin-bottom: 3px; font: 400 13px var(--font-sc); letter-spacing: 3px; text-transform: uppercase; color: var(--gold-hi); }
   #swatches { position: absolute; left: 50%; bottom: 12.5%; transform: translateX(-50%); display: flex; gap: 13px; align-items: center; opacity: 0; transition: opacity 0.5s; }
   #swatches.on { opacity: 1; }
   #swatches i { width: 13px; height: 13px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(26, 18, 54, 0.55), 0 2px 8px rgba(20, 10, 50, 0.5); transition: transform 0.25s; }

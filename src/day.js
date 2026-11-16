@@ -90,21 +90,6 @@ const ROOM = { ...PAPER,
   sunCol: rgb(1.0, 0.95, 0.85), sunDir: dir(0, 0.9, -0.3),
   fog: hex(0xe6dccb), hemiSky: hex(0xfff6e8), hemiGround: hex(0xb89a80), hemiI: 1.5,
   sun: hex(0xfff2dc), sunI: 1.5, sunPos: dir(0.2, 1.0, 0.3), far: hex(0xe0d4c2), cloud: hex(0x9a8a7a), tint: hex(0xfffaf2) };
-const RAIN = { ...PAPER,
-  top: rgb(0.36, 0.42, 0.52), mid: rgb(0.50, 0.56, 0.64), hor: rgb(0.68, 0.72, 0.76), low: rgb(0.52, 0.58, 0.66),
-  cream: rgb(0.80, 0.83, 0.86), rose: rgb(0.62, 0.66, 0.72), violet: rgb(0.42, 0.46, 0.56), blue: rgb(0.38, 0.44, 0.56),
-  sunCol: rgb(0.8, 0.85, 0.9), fog: hex(0x93a0ac), hemiSky: hex(0xd6e0ea), hemiGround: hex(0x6e8088), hemiI: 1.25,
-  sun: hex(0xdfe8f2), sunI: 1.0, far: hex(0x98a4b0), cloud: hex(0x56606e), tint: hex(0xf2f6ff) };
-const WASHED = { ...PAPER,
-  top: rgb(0.30, 0.50, 0.92), mid: rgb(0.55, 0.70, 0.97), hor: rgb(0.92, 0.90, 0.86), low: rgb(0.76, 0.80, 0.94),
-  cream: rgb(1.0, 0.97, 0.90), rose: rgb(0.98, 0.82, 0.84), violet: rgb(0.60, 0.60, 0.86), blue: rgb(0.36, 0.50, 0.90),
-  sunCol: rgb(1.1, 0.95, 0.7), fog: hex(0xbcd0ee), hemiSky: hex(0xf0f6ff), hemiGround: hex(0x9ab890), hemiI: 1.55,
-  sun: hex(0xfff4dc), sunI: 2.0, far: hex(0xdfe8f6), cloud: hex(0x7a84a0), tint: hex(0xffffff) };
-const BLAZE = { ...PAPER,
-  top: rgb(0.42, 0.62, 0.96), mid: rgb(0.78, 0.84, 0.96), hor: rgb(1.0, 0.96, 0.80), low: rgb(0.98, 0.90, 0.70),
-  cream: rgb(1.0, 1.0, 0.94), rose: rgb(1.0, 0.92, 0.78), violet: rgb(0.86, 0.80, 0.74), blue: rgb(0.62, 0.74, 0.95),
-  sunCol: rgb(1.8, 1.6, 1.1), sunDir: dir(-0.1, 0.34, -1), fog: hex(0xf6e8c0), hemiSky: hex(0xfffbe8), hemiGround: hex(0xe0b070), hemiI: 1.75,
-  sun: hex(0xfff6d8), sunI: 2.7, sunPos: dir(-0.15, 1.0, -0.35), far: hex(0xfaf0d0), cloud: hex(0xb0a080), tint: hex(0xfffbe6) };
 const GREY = { ...ROOM,
   top: rgb(0.30, 0.30, 0.32), mid: rgb(0.42, 0.42, 0.44), hor: rgb(0.55, 0.55, 0.56), low: rgb(0.34, 0.34, 0.36),
   cream: rgb(0.66, 0.66, 0.67), rose: rgb(0.50, 0.50, 0.52), violet: rgb(0.36, 0.36, 0.38), blue: rgb(0.40, 0.40, 0.42),
@@ -113,9 +98,25 @@ const GREY = { ...ROOM,
 const LOOKS = {
   paper: PAPERS,
   grey: [{ t: 0, ...GREY }, { t: 1, ...GREY }],
-  hall: [{ t: 0, ...ROOM }, { t: 1, ...ROOM }],
-  flood: [{ t: 0, ...RAIN }, { t: 1, ...WASHED }],
-  summer: [{ t: 0, ...BLAZE }, { t: 1, ...BLAZE, hemiGround: hex(0xb8c880), fog: hex(0xeef0c8) }],
+  hall: [{ t: 0, ...ROOM }, { t: 1, ...GREY }],          // (the room as it is, and with the colour gone out of it: it goes by degrees)
+  // Three Tubes: a violet sky with the moon up, which is as much day as that picture has; and then, once violet is
+  // mixed, the night. (The light in the sky is where the moon is.)
+  tubes: [
+    { ...KEYS[3], t: 0,
+      top: rgb(0.13, 0.11, 0.52), mid: rgb(0.34, 0.26, 0.80), hor: rgb(0.84, 0.60, 0.94), low: rgb(0.56, 0.42, 0.90),
+      cream: rgb(0.92, 0.86, 1.0), rose: rgb(0.80, 0.60, 0.96), violet: rgb(0.46, 0.34, 0.86), blue: rgb(0.26, 0.24, 0.76),
+      sunCol: rgb(1.0, 0.86, 0.96), sunDir: dir(-0.4, 0.49, -0.78), stars: 0.4,
+      fog: hex(0x8f76dc), hemiSky: hex(0xdcd0ff), hemiGround: hex(0x9060cc), hemiI: 1.42,
+      sun: hex(0xf2e2ff), sunI: 1.55, sunPos: dir(-0.4, 0.8, -0.5),
+      far: hex(0xbca4ec), cloud: hex(0x6654a8), sea: hex(0xc8b0f6), tint: hex(0xfff4ff) },
+    { ...KEYS[4], t: 1,
+      top: rgb(0.05, 0.04, 0.27), mid: rgb(0.17, 0.11, 0.48), hor: rgb(0.54, 0.30, 0.74), low: rgb(0.30, 0.19, 0.56),
+      cream: rgb(0.74, 0.64, 0.94), rose: rgb(0.62, 0.40, 0.80), violet: rgb(0.26, 0.19, 0.56), blue: rgb(0.11, 0.10, 0.40),
+      sunCol: rgb(1.0, 0.86, 0.96), sunDir: dir(-0.4, 0.49, -0.78), stars: 1,
+      fog: hex(0x4c3c9c), hemiSky: hex(0xa8a0ff), hemiGround: hex(0x7048ac), hemiI: 1.14,
+      sun: hex(0xd0ccff), sunI: 1.05, sunPos: dir(-0.4, 0.8, -0.5),
+      far: hex(0x7468c0), cloud: hex(0x3a3074), sea: hex(0x8a80e0), tint: hex(0xf2f0ff) },
+  ],
 };
 
 export class Day {

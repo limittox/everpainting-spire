@@ -8,18 +8,15 @@ import { buildPainter } from './painter.js';
 import { ghostMaterial } from './sketches.js';
 
 // Varnishing Day: the third level. The painter steps out of the painting into the gallery where it hangs, the
-// day before the doors open. The pictures on the walls are nearly finished: each has too much of one thing and
-// not enough of another, and here the brush learns to carry. It lifts a thing out of one picture and lays it
-// down in another.
+// day before the doors open.
 //
-//   The Gallery    a round floor with the frames standing on it. Stepping into a frame is stepping into its picture.
-//   The Flood      a drowned orchard: water almost to the top of its one hill. Lift the water (twice) and the
-//                  ground comes back, ring by ring.
-//   High Summer    a parched field, a dry spring and a dry mill pond. Each wants a brushful of water.
+//   The Gallery    a round floor with the frames standing on it, each with its name on a plate. Stepping into a
+//                  frame is stepping into its picture.
+//   Three Tubes    the one picture that can be stepped into (see tubes.js): a picture painted with red, yellow and
+//                  blue, where anything else has to be mixed. At its far end is a field, and in the field a Piper.
+//                  The field is built here, because of what happens in it afterwards.
 //
-// The brush holds one thing at a time, and nothing is ever lost: whatever was laid down can be lifted again.
-//
-// And then it goes wrong. Once both pictures are finished, one of the dust sheets is found on the floor, and the
+// And then it goes wrong. Once the three colours are mixed, one of the dust sheets is found on the floor, and the
 // painting it covered is a painting of this room, in grey, with someone standing in it wherever the painter stands.
 // Stepping into it leads to the same room with the colour gone out of it, the companions nowhere, every other
 // frame shut, and somebody in each of the pictures. From here on the game is not the gentle one it began as.
@@ -34,7 +31,7 @@ import { ghostMaterial } from './sketches.js';
 // From the moment the painter steps into that picture there is no colour anywhere, and after the portrait there never
 // is again: the painter is left with Cream, which is blank, in a world in black and white.
 //
-// And the companions. A piper lives in High Summer, and is glad of company: the companions go to the piper, dance,
+// And the companions. A piper lives in the field at the end of Three Tubes, and is glad of company: the companions go to the piper, dance,
 // and do not come away again. That is the happiest place in the game. Afterwards it is where they are found.
 //
 // And it does not stop at the portrait. One of the companions is not quite dead, and tries to come to the painter.
@@ -47,35 +44,28 @@ import { ghostMaterial } from './sketches.js';
 // gone for good. Or they can follow the blood home. The other one is in the atelier, painting in the painter's
 // colours, with its back to the door; painted out, it gives back what it took, and the colour comes home.
 //
-// It does not come from nowhere. Each time something is lifted the music loses a layer; the dust sheet over that
-// picture hangs a little lower every time the painter comes back into the room; and the game counts the lifts.
+// It does not come from nowhere. Each time something is mixed the music loses a layer, and the dust sheet over that
+// picture hangs a little lower every time the painter comes back into the room.
 // (It all lives far to the east of everything else, in the same scene.)
 
 const V3 = THREE.Vector3, TAU = Math.PI * 2;
 const HALL = { x: 4000, y: 0, z: 1000, r: 19, ph: 0.4, name: 'The Gallery', pale: true };
-const FLOOD = { x: 6000, y: 0, z: 1000, r: 25, ph: 2.1, name: 'The Flood', pale: true };
-const SUMMER = { x: 8000, y: 0, z: 1000, r: 26, ph: 5.2, name: 'High Summer', pale: true };
-
-const HILL = 3.2, LEVELS = [-0.6, 1.25, 2.6];                       // the Flood's hill, and how high the water stands on it
-const hill = (d) => HILL * (1 - smooth(clamp((d - 3.5) / 17.5, 0, 1)));
-/** How far from the middle of the Flood the water's edge is, with the water standing `wy` high. */
-function shoreR(wy) {
-  if (wy <= 0.02) return 99;
-  let a = 0, b = 21;
-  for (let i = 0; i < 14; i++) { const m = (a + b) / 2; if (hill(m) > wy) a = m; else b = m; }
-  return a;
-}
+// (the field at the far end of Three Tubes: where the Piper is, and where the companions stay)
+const SUMMER = { x: 8000, y: 0, z: 1000, r: 26, ph: 5.2, name: 'Three Tubes', pale: true, quiet: true };
 
 const WOOD = ['#a87848', '#c29460', '#9c6c40', '#cda470', '#b4844f'];
-const MEADOW = ['#7f9a7a', '#93a888', '#6f8a78', '#a2b094', '#84a092'];
+export const MEADOW = ['#7f9a7a', '#93a888', '#6f8a78', '#a2b094', '#84a092'];
 const PARCHED = ['#d2b477', '#e2cc96', '#c9a868', '#ead8a8', '#bf9c5c'];
-const EARTH = ['#8a6a50', '#a07c5c', '#75584a', '#b08e6a', '#6a5046'];
+export const EARTH = ['#8a6a50', '#a07c5c', '#75584a', '#b08e6a', '#6a5046'];
+// Three Tubes: violet ground, and the dark crystal the islands hang by
+export const DUSK = ['#6a4cc0', '#8058d0', '#4a34a0', '#a070e0', '#3c5cc8', '#c060d0', '#4c7ce0'];
+export const CRYSTAL = ['#3a2478', '#4a2e96', '#2c1c64', '#5c3cb4', '#241650', '#7a44c8'];
 const CLOTH = ['#efe8da', '#e2d9c8', '#f6f1e6', '#d6ccba'];
 const GILT = ['#d9b25a', '#c99a3e', '#ecd084', '#b8862e'];
 const WATER = '#58c0e8';
 
 /** A ground canvas laid in brush strokes. `ang(i)` gives each stroke its direction; `extra` draws on top. */
-function ground(isl, size, base, pal, n, seed, ang = null, extra = null) {
+export function ground(isl, size, base, pal, n, seed, ang = null, extra = null) {
   const c = document.createElement('canvas'); c.width = c.height = size;
   const x = c.getContext('2d'), r = mulberry32(seed), span = 2 * isl.r * SPAN, px = size / span;
   x.fillStyle = base; x.fillRect(0, 0, size, size);
@@ -145,7 +135,17 @@ function roomPicture(empty) {
 
 const giltMat = new THREE.MeshLambertMaterial({ color: 0xd9b25a, emissive: 0x4a3410, flatShading: true });
 /** A gilt frame standing on the floor, `w` by `h` inside, with a picture in it (or bare boards). */
-function frame(w, h, tex) {
+function plate(title, wide) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 124;
+  const x = c.getContext('2d');
+  x.fillStyle = '#f3e7c4'; x.fillRect(0, 0, 512, 124);          // (big heavy letters, dark on pale: the brushwork eats anything finer)
+  x.strokeStyle = '#6a4a14'; x.lineWidth = 10; x.strokeRect(5, 5, 502, 114);
+  x.fillStyle = '#17100a'; x.font = '700 60px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(title.toUpperCase(), 256, 66, 470);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return new THREE.Mesh(new THREE.PlaneGeometry(wide, (wide * 124) / 512), new THREE.MeshBasicMaterial({ map: t, fog: false }));
+}
+function frame(w, h, tex, title = null) {
   const g = new THREE.Group(), t = 0.36, y0 = 0.5;
   for (const [bw, bh, x, y] of [[w + 2 * t, t, 0, y0 + h + t / 2], [w + 2 * t, t, 0, y0 - t / 2], [t, h, -(w + t) / 2, y0 + h / 2], [t, h, (w + t) / 2, y0 + h / 2]]) {
     const bar = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.34), giltMat); bar.position.set(x, y, 0); g.add(bar);
@@ -153,68 +153,21 @@ function frame(w, h, tex) {
   for (const s of [-1, 1]) { const foot = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.34, 1.5), giltMat); foot.position.set(s * (w / 2), 0.17, 0); g.add(foot); }
   g.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08).translate(0, y0 + h / 2, -0.08), new THREE.MeshLambertMaterial({ color: 0x4a4048, emissive: 0x16131a })));
   if (tex) { g.userData.pic = new THREE.Mesh(new THREE.PlaneGeometry(w, h).translate(0, y0 + h / 2, 0.02), new THREE.MeshBasicMaterial({ map: tex, fog: false })); g.add(g.userData.pic); }
+  if (title) { g.userData.plate = plate(title, Math.min(w - 0.2, 3.3)); g.userData.plate.position.set(0, y0 + 0.5, 0.09); g.add(g.userData.plate); }
   return g;
-}
-
-/** The Flood's hill: ground that rises toward the middle, textured from the island's one canvas by where it lies. */
-function hillGeo(isl, R = 21, K = 26, S = 72) {
-  const pos = [], uv = [], idx = [];
-  for (let k = 0; k <= K; k++) for (let i = 0; i <= S; i++) {
-    const th = (i / S) * TAU, rad = (R * k) / K, x = isl.x + Math.cos(th) * rad, z = isl.z + Math.sin(th) * rad;
-    pos.push(x, surfY(isl, x, z) + hill(rad) + 0.03, z);
-    uv.push((x - isl.x) / (2 * isl.r * SPAN) + 0.5, 0.5 - (z - isl.z) / (2 * isl.r * SPAN));
-  }
-  for (let k = 0; k < K; k++) for (let i = 0; i < S; i++) { const p = k * (S + 1) + i, q = p + S + 1; idx.push(p, p + 1, q, p + 1, q + 1, q); }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setIndex(idx);
-  g.computeVertexNormals();
-  return g;
-}
-
-/** Standing water over a whole island, in one piece: the flat of it, and the curtain where it pours off the rim. */
-function floodMesh(isl, uTime, S = 96, H = 16) {
-  const pos = [0, 0, 0], idx = [];
-  for (const y of [0, -H]) for (let i = 0; i <= S; i++) { const th = (i / S) * TAU, r = rimR(isl, th) * 1.03; pos.push(Math.cos(th) * r, y, Math.sin(th) * r); }
-  for (let i = 0; i < S; i++) { const a = 1 + i, b = a + S + 1; idx.push(0, a + 1, a, a, a + 1, b, a + 1, b + 1, b); }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setIndex(idx);
-  const mat = new THREE.ShaderMaterial({
-    uniforms: { time: uTime, tint: { value: new THREE.Color('#7fb0cc') }, depth: { value: H } },
-    vertexShader: /* glsl */ `varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: /* glsl */ `
-precision highp float;
-uniform float time; uniform vec3 tint; uniform float depth;
-varying vec3 vPos;
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float vnoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
-}
-void main() {
-  float fall = clamp(-vPos.y / depth, 0.0, 1.0);
-  vec2 p = fall > 0.001 ? vec2(atan(vPos.z, vPos.x) * 16.0, vPos.y * 0.45 + time * 1.9) : vPos.xz * 0.33 + vec2(time * 0.13, time * 0.08);
-  float n = vnoise(p), s = vnoise(p * 2.7 + 9.0);
-  vec3 col = tint * (0.74 + 0.4 * n);
-  col = mix(col, vec3(1.0), smoothstep(0.68, 0.92, s) * 0.5);
-  gl_FragColor = vec4(col, 0.86 * pow(1.0 - fall, 1.4));
-}`,
-    transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
-  });
-  const m = new THREE.Mesh(g, mat);
-  m.frustumCulled = false; m.renderOrder = 2;
-  return m;
 }
 
 export class Gallery {
-  /** `atelier` is the middle of the Spire's hall: once the gallery has been found, a frame stands there that leads back to it. */
-  constructor(scene, world, uTime, lastpage, atelier) {
-    this.scene = scene; this.world = world; this.lastpage = lastpage; this.found = false;
+  /**
+   * `atelier` is the middle of the Spire's hall: once the gallery has been found, a frame stands there that leads back to it.
+   * `tubes` is the picture that can be stepped into.
+   */
+  constructor(scene, world, uTime, lastpage, atelier, tubes) {
+    this.scene = scene; this.world = world; this.lastpage = lastpage; this.tubes = tubes; this.found = false;
     this.wiped = 0; this.unpainted = 0; this.undone = false;      // how much of the portrait, and of the other painter, has been painted out
     this.indoors = false;                                   // (the game says) in the Spire's atelier
     this.homeSpot = new V3(atelier.x, atelier.y, atelier.z - 8.5);
+    this.greyK = 0;                                         // how far the colour has gone out of the gallery (it goes slowly)
     this.after = 0;                                         // how often the gallery has been come back to since the portrait
     this.outdoors = false; this.sightT = 12;                // (the game says) out in the first painting; and how long until somebody is seen there
     this.beatT = 0; this.holdT = 0; this.scared = false; this.crawled = false;
@@ -241,8 +194,7 @@ export class Gallery {
       return isl;
     };
     const hall = island(HALL, (i) => ground(i, 1024, '#b98a5a', WOOD, 1500, 71, (k) => (k % 2 ? 1 : -1) * Math.PI / 4), [...WOOD, ...EARTH]);
-    const flood = island(FLOOD, (i) => ground(i, 2048, '#8fa08c', MEADOW, 2600, 72), EARTH);
-    const summer = island(SUMMER, (i) => ground(i, 2048, '#d9c08a', PARCHED, 2600, 73), EARTH);
+    const summer = island(SUMMER, (i) => ground(i, 2048, '#6c5cb8', ['#6252ae', '#7a6cc8', '#5646a0', '#8c80d8', '#6a7ad0', '#9a70d0'], 2600, 73), CRYSTAL);
     this.hall = hall;
 
     // every frame that can be stepped through: where it stands, what E says, and where it leads
@@ -259,10 +211,18 @@ export class Gallery {
     const hp = (a, rad) => { const x = HALL.x + Math.cos(a) * rad, z = HALL.z + Math.sin(a) * rad; return new V3(x, surfY(HALL, x, z), z); };
     const centre = (isl) => new V3(isl.x, isl.y, isl.z);
 
-    // --- the pictures, as they look from outside
+    // --- Three Tubes as it hangs in the gallery: three daubs of paint, and under them whatever has been mixed so far
+    // (plain shapes with dark edges, so the picture can be told by its drawing when there is no colour to tell it by)
+    const tubePic = (k) => picture('#efe6d4', ['#e8dcc6', '#f4ecdc', '#ddd0b8', '#f8f2e4'], 81, (x) => {
+      const blob = (u, v, rad, col) => { x.fillStyle = col; x.beginPath(); x.ellipse(u, v, rad, rad * 0.8, 0.3, 0, TAU); x.fill(); x.strokeStyle = 'rgba(30,20,40,0.6)'; x.lineWidth = 4; x.stroke(); };
+      blob(62, 92, 32, PAINTS[0].hex); blob(128, 92, 32, PAINTS[1].hex); blob(194, 92, 32, PAINTS[6].hex);
+      [[160, 180, PAINTS[7].hex], [96, 180, PAINTS[5].hex], [128, 254, PAINTS[3].hex]].forEach(([u, v, col], i) => {
+        if (i < k) blob(u, v, 30, col);
+        else { x.strokeStyle = 'rgba(30,20,40,0.45)'; x.lineWidth = 3; x.setLineDash([7, 7]); x.beginPath(); x.ellipse(u, v, 30, 24, 0.3, 0, TAU); x.stroke(); x.setLineDash([]); }
+      });
+    });
+    const tubeList = [0, 1, 2, 3].map(tubePic);
     const pic = {
-      flood: picture('#8ea4b4', ['#7f9ab0', '#9cb2c2', '#6c8aa2', '#b4c4cc'], 81, (x) => { x.fillStyle = '#7f9a7a'; x.beginPath(); x.ellipse(128, 250, 62, 26, 0, 0, TAU); x.fill(); x.fillStyle = '#5c7a62'; for (const u of [70, 190, 40, 226]) { x.beginPath(); x.arc(u, 232 + (u % 3) * 6, 13, 0, TAU); x.fill(); } }),
-      summer: picture('#ecd08a', ['#e6c470', '#f2dc9c', '#dcb45c', '#f8e8b4'], 82, (x) => { const g = x.createRadialGradient(170, 70, 4, 170, 70, 70); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 256, 320); }),
       hall: picture('#e8dcc8', ['#d9b25a', '#efe4d0', '#c8a070', '#f6eedf'], 83, (x) => { x.strokeStyle = '#8a6a3a'; x.lineWidth = 7; for (const [u, v] of [[40, 90], [150, 70], [96, 190]]) x.strokeRect(u, v, 64, 80); }),
       home: picture('#f6e2c0', PAINTS.slice(0, 8).map((p) => p.hex), 84, (x) => { const g = x.createRadialGradient(128, 150, 8, 128, 150, 150); g.addColorStop(0, 'rgba(255,246,214,0.9)'); g.addColorStop(1, 'rgba(255,246,214,0)'); x.fillStyle = g; x.fillRect(0, 0, 256, 320); }),
     };
@@ -274,9 +234,9 @@ export class Gallery {
       // atelier, where a frame of its own stands from then on, so the gallery is never more than a step away.
       const backAt = (this.backAt = hp(Math.PI / 2, 15.5)), pageAt = new V3(PAGE.x, surfY(PAGE, PAGE.x, PAGE.z - 14.5), PAGE.z - 14.5), pageMid = new V3(PAGE.x, PAGE.y, PAGE.z);
       const homeAt = new V3(atelier.x + Math.sin(1.2 * Math.PI) * 9.6, atelier.y, atelier.z + Math.cos(1.2 * Math.PI) * 9.6);
-      stand(lit(frame(W, H, pic.home), H), backAt, centre(HALL));
-      this.pageDoor = stand(lit(frame(W, H, pic.hall), H), pageAt, pageMid);
-      this.homeDoor = stand(lit(frame(W, H, pic.hall), H), homeAt, new V3(atelier.x, 0, atelier.z + 8));
+      stand(lit(frame(W, H, pic.home, 'The Way Home'), H), backAt, centre(HALL));
+      this.pageDoor = stand(lit(frame(W, H, pic.hall, 'The Gallery'), H), pageAt, pageMid);
+      this.homeDoor = stand(lit(frame(W, H, pic.hall, 'The Gallery'), H), homeAt, new V3(atelier.x, 0, atelier.z + 8));
       this.homeCol = world.colliders[world.colliders.length - 1];
       this.entry = arrive(backAt, centre(HALL), hall, flat(HALL));
       const dir = new V3(atelier.x - homeAt.x, 0, atelier.z - homeAt.z).normalize(), h = Math.atan2(dir.x, dir.z);
@@ -286,28 +246,24 @@ export class Gallery {
       // (in the atelier the camera goes out into the hall, looking back at the painter and the frame they stepped out of)
       this.doors.push({ at: backAt, text: 'Step back into the Spire', to: { pos: homeAt.clone().addScaledVector(dir, 3), heading: h, yaw: h }, toast: ['The Atelier', 'Inside the Spire'], out: true });
 
-      // two pictures that can be stepped into; their own frames, inside them, lead back here
-      const floodFloor = (x, z) => surfY(FLOOD, x, z) + hill(Math.hypot(x - FLOOD.x, z - FLOOD.z));
-      const pair = (a, isl, tex, toast, inAt, floor) => {
-        const at = hp(a, 15.5);
-        this.hung.push({ at, pic: stand(lit(frame(W, H, tex), H), at, centre(HALL)).userData.pic, tex, greys: [haunted(tex), haunted(tex, 2.3, 336), haunted(tex, 4.6, 492)], stage: 0, seen: false });
-        stand(lit(frame(W, H, pic.hall), H), inAt, centre(isl));
-        this.doors.push({ at, text: 'Step into the picture', to: arrive(inAt, centre(isl), isl, floor), toast });
-        this.doors.push({ at: inAt, text: 'Step back out of the picture', to: arrive(at, centre(HALL), hall, flat(HALL)), toast: ['The Gallery', ''], out: true });
-      };
-      const fAt = new V3(FLOOD.x, 0, FLOOD.z + 4.6); fAt.y = floodFloor(fAt.x, fAt.z);
-      const sAt = new V3(SUMMER.x, 0, SUMMER.z + 20.5); sAt.y = surfY(SUMMER, sAt.x, sAt.z);
-      pair(Math.PI * 0.92, flood, pic.flood, ['The Flood', 'More water than it wants'], fAt, floodFloor);
-      pair(Math.PI * 0.08, summer, pic.summer, ['High Summer', 'Not a drop'], sAt, flat(SUMMER));
-      this.sAt = sAt;
+      // one picture that can be stepped into. Two frames inside it lead back here: one where the painter arrives,
+      // and one in the field at its far end
+      {
+        const at = hp(Math.PI * 0.08, 15.5), whole = tubeList[3], first = tubes.first;
+        this.hung.push({ at, pic: stand(lit(frame(W, H, tubeList[0], 'Three Tubes'), H), at, centre(HALL)).userData.pic, list: tubeList, greys: [haunted(whole), haunted(whole, 2.3, 336), haunted(whole, 4.6, 492)], stage: 0, seen: false });
+        const sAt = new V3(SUMMER.x, 0, SUMMER.z + 20.5); sAt.y = surfY(SUMMER, sAt.x, sAt.z);
+        const back = arrive(at, centre(HALL), hall, flat(HALL));
+        stand(lit(frame(W, H, pic.hall, 'The Gallery'), H), tubes.frameAt, centre(first));
+        stand(lit(frame(W, H, pic.hall, 'The Gallery'), H), sAt, centre(SUMMER));
+        this.doors.push({ at, text: 'Step into Three Tubes', to: arrive(tubes.frameAt, centre(first), first, flat(first)), toast: ['Three Tubes', 'Red, yellow and blue'] });
+        for (const inAt of [tubes.frameAt, sAt]) this.doors.push({ at: inAt, text: 'Step back into the Gallery', to: back, toast: ['The Gallery', ''], out: true });
+        this.sAt = sAt;
+      }
 
-      // one more is still under its dust sheet, and the biggest frame of all is empty
+      // two more are still under their dust sheets, and the biggest frame of all is empty
       const sheet = (at) => place(new THREE.BoxGeometry(W + 1.1, H + 0.9, 0.8, 6, 6, 1), at.x, at.y + 0.5 + H / 2 + 0.1, at.z, 0, Math.atan2(HALL.x - at.x, HALL.z - at.z), 0);
-      const drapedAt = hp(Math.PI * -0.73, 15.5);
-      stand(frame(W, H, null), drapedAt, centre(HALL));
-      add(sheet(drapedAt), CLOTH, { scale: 0.5, spread: 1 });
-      this.draped = [drapedAt];
-      // the other sheet comes off by itself, when both pictures are finished and nobody is in the room to see it go.
+      this.draped = [-0.73, 0.92].map((f) => { const at = hp(Math.PI * f, 15.5); stand(frame(W, H, null), at, centre(HALL)); add(sheet(at), CLOTH, { scale: 0.5, spread: 1 }); return at; });
+      // the other sheet comes off by itself, when the picture is finished and nobody is in the room to see it go.
       // What it covered is a picture of this room, painted afresh whenever the painter moves (see update)
       {
         const at = hp(Math.PI * -0.27, 15.5), n = new V3(HALL.x - at.x, 0, HALL.z - at.z).normalize();
@@ -337,9 +293,9 @@ export class Gallery {
         this.frameGlow = glowSprite(world.glowTex, 13, 0xffffff, 0); this.frameGlow.position.set(0, 4.3, 1); g.add(this.frameGlow);
         this.doors.push({ at: this.empty, text: 'Step into the frame', to: arrive(this.empty, centre(HALL), hall, flat(HALL)), frame: true, open: () => this.whole && this.wholeT > 3.5 && !this.ended });
       }
-      // afterwards: drops of red across the floor, from High Summer's frame to the way home
+      // afterwards: drops of red across the floor, from the frame of Three Tubes to the way home
       {
-        const from = this.hung[1].at, to = this.backAt, blood = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.0, 0.012), fog: false, side: THREE.DoubleSide, transparent: true, opacity: 0, blending: THREE.NoBlending });          // (no alpha: that is how the picture knows it for blood)
+        const from = this.hung[0].at, to = this.backAt, blood = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.0, 0.012), fog: false, side: THREE.DoubleSide, transparent: true, opacity: 0, blending: THREE.NoBlending });          // (no alpha: that is how the picture knows it for blood)
         this.trail = new THREE.Group();
         for (let i = 0; i < 24; i++) {
           const f = (i + 0.5) / 24, x = from.x + (to.x - from.x) * f + (rb() - 0.5) * 1.1, z = from.z + (to.z - from.z) * f + (rb() - 0.5) * 1.1;
@@ -378,53 +334,21 @@ export class Gallery {
       }
     }
 
-    // --- the Flood: a hill in the middle, an orchard round it, and water over nearly all of it
+    // --- the village at the far end of Three Tubes: a spring and its stream, a pond, a mill, houses round a green, and
+    // everybody out dancing to the Piper
     {
-      const F = (this.flood = { level: 2, wy: LEVELS[2], dryK: 0 });
-      const topMat = paintify(new THREE.MeshLambertMaterial({ map: flood.tex }), { scale: 1, amp: 0.45 });
-      scene.add(new THREE.Mesh(hillGeo(FLOOD), topMat));
-      F.water = floodMesh(FLOOD, uTime);
-      F.water.position.set(FLOOD.x, FLOOD.y + F.wy, FLOOD.z);
-      scene.add(F.water);
-      // the orchard: grey with wet while it stands in water; it flowers when the ground is dry
-      const crowns = new Bag();
-      for (let k = 0; k < 15; k++) {
-        const a = (k / 15) * TAU + (r() - 0.5) * 0.25, d = 10.5 + (k % 3) * 3.3 + r(), x = FLOOD.x + Math.cos(a) * d, z = FLOOD.z + Math.sin(a) * d, y = surfY(FLOOD, x, z) + hill(d), s = 0.9 + r() * 0.35;
-        if (Math.abs(a - Math.PI / 2) < 0.35 && d < 12) continue;                         // (keep the view from the frame open)
-        add(place(new THREE.CylinderGeometry(0.17 * s, 0.32 * s, 4.2 * s, 6), x, y + 2.1 * s, z, 0, 0, 0.06), EARTH, { scale: 0.6 });
-        for (const [ox, oy, oz, rr] of [[0, 5.0, 0, 1.7], [1.2, 4.3, 0.4, 1.2], [-1.1, 4.4, -0.5, 1.25], [0.2, 6.1, -0.3, 1.0]]) {
-          crowns.add(daub(place(new THREE.IcosahedronGeometry(rr * s, 1), x + ox * s, y + oy * s, z + oz * s, 0, rr * 2, 0, 1, 0.74, 1), ['#ffffff', '#f2f0ee', '#e6e2e4', '#fbf6f8'], { scale: 0.5, spread: 1 }));
-        }
-        world.colliders.push({ x, z, r: 0.5 * s, late: true });
-      }
-      F.crownMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x1a1c1c }), { scale: 1.1, amp: 0.5 });
-      F.crowns = crowns.mesh(F.crownMat);
-      F.crowns.frustumCulled = false;
-      scene.add(F.crowns);
-      world.paintable.push(F.crowns);
-    }
-
-    // --- High Summer: a dry spring, the bed its stream once ran in, a dry pond, a mill, and wheat gone to straw
-    {
-      const S = (this.summer = { wetK: [0, 0] });
+      const S = (this.summer = { wetK: [1, 1] });
       const sp = (a, rad) => { const x = SUMMER.x + Math.cos(a) * rad, z = SUMMER.z + Math.sin(a) * rad; return new V3(x, surfY(SUMMER, x, z), z); };
       const npcAt = sp(3.4, 6.5);
       const springAt = sp(1.95, 12), pondAt = sp(-1.35, 13), rimA = 0.4, rimAt = sp(rimA, rimR(SUMMER, rimA) + 0.2);
       const bed = new THREE.CatmullRomCurve3([springAt, sp(1.6, 11), sp(1.2, 12.5), sp(0.8, 16), sp(0.5, 21), rimAt]).getSpacedPoints(60);
       bed.forEach((p) => { p.y = surfY(SUMMER, p.x, p.z) + 0.1; });
-      // the dry bed, and the cracks of a long drought, drawn onto the ground
+      // the bed of the stream, and of the pond, drawn onto the ground
       {
         const cv = summer.tex.image, x = cv.getContext('2d'), span = summer.span, U = (wx) => ((wx - SUMMER.x) / span + 0.5) * cv.width, V = (wz) => ((wz - SUMMER.z) / span + 0.5) * cv.width, px = cv.width / span;
         x.lineCap = 'round'; x.lineJoin = 'round';
         x.strokeStyle = 'rgba(150,118,72,0.75)'; x.lineWidth = 1.5 * px; x.beginPath(); bed.forEach((p, i) => (i ? x.lineTo(U(p.x), V(p.z)) : x.moveTo(U(p.x), V(p.z)))); x.stroke();
         x.fillStyle = 'rgba(150,118,72,0.8)'; x.beginPath(); x.arc(U(pondAt.x), V(pondAt.z), 4.4 * px, 0, TAU); x.fill();
-        x.strokeStyle = 'rgba(110,84,50,0.55)'; x.lineWidth = 0.09 * px;
-        for (let i = 0; i < 90; i++) {
-          let a = r() * TAU, d = Math.sqrt(r()) * 23, wx = SUMMER.x + Math.cos(a) * d, wz = SUMMER.z + Math.sin(a) * d, t = r() * TAU;
-          x.beginPath(); x.moveTo(U(wx), V(wz));
-          for (let k = 0; k < 5; k++) { t += (r() - 0.5) * 1.6; wx += Math.cos(t) * (0.5 + r()); wz += Math.sin(t) * (0.5 + r()); x.lineTo(U(wx), V(wz)); }
-          x.stroke();
-        }
         summer.tex.needsUpdate = true;
       }
       const dry = () => new THREE.MeshBasicMaterial({ color: 0x9a8460, fog: false });
@@ -434,9 +358,9 @@ export class Gallery {
         pool.position.set(pos.x, pos.y + 0.2, pos.z);
         const glint = glowSprite(world.glowTex, rad * 3, 0xffffff, 0.3); glint.position.set(pos.x, pos.y + 1.1, pos.z);
         scene.add(pool, glint);
-        return { key, pos, reach, lay, lift, pool, glint, wet: false, top: new V3(pos.x, pos.y + 0.9, pos.z) };
+        return { key, pos, reach, lay, lift, pool, glint, wet: true, top: new V3(pos.x, pos.y + 0.9, pos.z) };
       };
-      S.spots = [spot('spring', springAt, 1.3, 4.2, 'Lay the water in the spring', 'Lift the water out of the spring'), spot('pond', pondAt, 4.2, 6.6, 'Lay the water in the pond', 'Lift the water out of the pond')];
+      S.spots = [spot('spring', springAt, 1.3, 4.2, 'Lay the blue on the spring', 'Lift the water out of the spring'), spot('pond', pondAt, 4.2, 6.6, 'Lay the blue in the pond', 'Lift the water out of the pond')];
       add(place(new THREE.BoxGeometry(0.9, 1.5, 0.7), springAt.x - 1.4, springAt.y + 0.7, springAt.z + 0.6, 0, 0.5, 0), STONE, { scale: 0.8 });
       // the stream, and where it goes over the edge
       S.stream = makeStream(scene, uTime, bed, 1.15);
@@ -446,8 +370,8 @@ export class Gallery {
 
       // the mill beside the pond: a hut, and a wheel that only turns when there is water under it
       const hut = new V3(pondAt.x - 6.6, pondAt.y, pondAt.z - 0.6);
-      add(place(new THREE.BoxGeometry(3.4, 2.8, 3.2), hut.x, hut.y + 1.4, hut.z), ['#f2e6cc', '#e6d6b4', '#f8eed8'], { scale: 0.5 });
-      add(place(new THREE.ConeGeometry(3.1, 2.0, 4), hut.x, hut.y + 3.8, hut.z, 0, Math.PI / 4, 0), ['#c8643c', '#b4502c', '#d87a4a'], { scale: 0.5 });
+      add(place(new THREE.BoxGeometry(3.4, 2.8, 3.2), hut.x, hut.y + 1.4, hut.z), ['#f2e8ff', '#e2d4f6', '#fbf4ff'], { scale: 0.5 });
+      add(place(new THREE.ConeGeometry(3.1, 2.0, 4), hut.x, hut.y + 3.8, hut.z, 0, Math.PI / 4, 0), ['#6a4cc0', '#7c5cd4', '#5a3ca8'], { scale: 0.5 });
       world.colliders.push({ x: hut.x, z: hut.z, r: 2.4, late: true });
       const wheel = new THREE.Group(), grey = new THREE.MeshLambertMaterial({ color: 0x8a6a4a, emissive: 0x241a12, flatShading: true });
       wheel.position.set(pondAt.x - 3.9, pondAt.y + 1.75, pondAt.z - 0.6); wheel.rotation.y = Math.PI / 2;
@@ -497,75 +421,107 @@ export class Gallery {
         S.crawl = { b: null, state: 'still', gone: 0, laid: 0 };
       }
 
+      // ---- the village: houses round the green, lights strung from a pole, and everybody out of doors
+      const V = (S.village = { folk: [], bulbs: [], down: false });
+      {
+        const roof = ['#6a4cc0', '#7c5cd4', '#5a3ca8', '#8a6ce0'], wall = ['#f2e8ff', '#e2d4f6', '#fbf4ff', '#d4c4ec'], LAMP = ['#ffe6a8', '#fff4d0', '#ffd27a'], lit = new Bag();
+        const house = (ang, rad, k, tall = 0) => {
+          const p = sp(ang, rad), yaw = Math.atan2(SUMMER.x - p.x, SUMMER.z - p.z), fx = Math.sin(yaw), fz = Math.cos(yaw), sx = Math.cos(yaw), sz = -Math.sin(yaw), H = (2.6 + tall) * k;
+          add(place(new THREE.BoxGeometry(3.4 * k, H, 3.0 * k), p.x, p.y + H / 2, p.z, 0, yaw, 0), wall, { scale: 0.5 });
+          add(place(new THREE.ConeGeometry(2.9 * k, 2.3 * k, 4), p.x, p.y + H + 1.1 * k, p.z, 0, yaw + Math.PI / 4, 0), roof, { scale: 0.5 });
+          add(place(new THREE.BoxGeometry(0.5 * k, 1.3 * k, 0.5 * k), p.x + sx * 0.9 * k, p.y + H + 1.2 * k, p.z + sz * 0.9 * k, 0, yaw, 0), wall, { scale: 0.5 });
+          // its door and its windows, lit from inside
+          const front = (dx, y, w, h) => lit.add(daub(place(new THREE.BoxGeometry(w * k, h * k, 0.12), p.x + fx * 1.53 * k + sx * dx * k, p.y + y * k, p.z + fz * 1.53 * k + sz * dx * k, 0, yaw, 0), LAMP, { scale: 2, spread: 1 }));
+          front(0, 0.8, 0.85, 1.6); front(-1.1, 1.7, 0.6, 0.65); front(1.1, 1.7, 0.6, 0.65);
+          if (tall) { front(0, 3.4, 0.7, 0.9); front(-1.1, 3.4, 0.5, 0.6); front(1.1, 3.4, 0.5, 0.6); }
+          world.colliders.push({ x: p.x, z: p.z, r: 2.35 * k, late: true });
+          return { p, top: new V3(p.x, p.y + H + 2.2 * k, p.z), door: new V3(p.x + fx * 3.4 * k, 0, p.z + fz * 3.4 * k) };
+        };
+        V.houses = [house(2.62, 18, 1), house(3.58, 18.5, 1.1), house(5.76, 18, 1), house(0, 17, 0.95), house(3.1, 20.8, 1.05, 2.2)];
+        // the pole on the green, a star on it, and the lights strung from it to every roof
+        const pole = sp(0, 0);
+        add(place(new THREE.CylinderGeometry(0.12, 0.18, 8, 6), pole.x, pole.y + 4, pole.z), ['#f2d8a0', '#e8c078', '#fff0c8'], { scale: 0.6 });
+        lit.add(daub(place(new THREE.OctahedronGeometry(0.5), pole.x, pole.y + 8.5, pole.z, 0, 0, 0, 1, 2, 0.4), LAMP, {})); lit.add(daub(place(new THREE.OctahedronGeometry(0.5), pole.x, pole.y + 8.5, pole.z, 0, 0, 0, 2, 1, 0.4), LAMP, {}));
+        world.colliders.push({ x: pole.x, z: pole.z, r: 0.4, late: true });
+        V.pole = pole;
+        const head = new V3(pole.x, pole.y + 8, pole.z);
+        [...V.houses.map((h) => h.top), new V3(hut.x, hut.y + 4.8, hut.z)].forEach((top, n) => {
+          for (let i = 1; i < 8; i++) {
+            const q = head.clone().lerp(top, i / 8); q.y -= Math.sin((i / 8) * Math.PI) * 1.5;
+            const b = glowSprite(world.glowTex, 1.7, [0xffe2a0, 0xff9ae0, 0x8ae6ff, 0xc8a8ff][(i + n) % 4], 0.95); b.position.copy(q);
+            scene.add(b); V.bulbs.push(b);
+          }
+        });
+        const star = glowSprite(world.glowTex, 9, 0xfff0c0, 0.8); star.position.set(pole.x, pole.y + 8.5, pole.z); scene.add(star); V.bulbs.push(star);
+        V.windows = lit.mesh(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })); V.windows.frustumCulled = false;
+        scene.add(V.windows);
+        // the people of the village
+        const cloth = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2a2236 }), { scale: 1.2, amp: 0.35 });
+        const ROBES = ['#e86a9a', '#3fb8b0', '#f0c050', '#b48cff', '#5a9cf0', '#ff9a70', '#7ad8a0', '#f4eede', '#d870d0', '#70c8e8'], SKIN = ['#f0c9a0', '#e0b088', '#c89070', '#f6d8b8'], HAIR = ['#5a3a2a', '#2e2430', '#c89a50', '#8a5a3a'];
+        const person = (i, k = 1) => {
+          const g = new Bag(), one = (geo, c) => g.add(daub(geo, [c, c], {})), robe = ROBES[i % ROBES.length];
+          one(place(new THREE.ConeGeometry(0.62, 1.4, 8), 0, 0.82, 0), robe);
+          one(place(new THREE.IcosahedronGeometry(0.33, 1), 0, 1.78, 0), SKIN[i % SKIN.length]);
+          if (i % 3 === 0) one(place(new THREE.ConeGeometry(0.36, 0.62, 8), 0, 2.3, 0), ROBES[(i + 3) % ROBES.length]);
+          else if (i % 3 === 1) { one(place(new THREE.CylinderGeometry(0.62, 0.66, 0.06, 12), 0, 2.03, 0), '#e8c46a'); one(place(new THREE.ConeGeometry(0.32, 0.36, 9), 0, 2.22, 0), '#e8c46a'); }
+          else one(place(new THREE.IcosahedronGeometry(0.37, 1), 0, 1.9, -0.07, 0, 0, 0, 1, 0.8, 1), HAIR[i % HAIR.length]);
+          for (const q of [-1, 1]) one(place(new THREE.BoxGeometry(0.16, 0.85, 0.16), q * 0.62, 1.55, 0, 0, 0, q * -0.9), robe);      // (both arms up)
+          const m = g.mesh(cloth); m.scale.setScalar(k);
+          scene.add(m);
+          return m;
+        };
+        const folk = (kind, o) => V.folk.push({ kind, m: person(V.folk.length, o.k || 1), k: o.k || 1, i: V.folk.length, ...o });
+        for (let i = 0; i < 8; i++) folk('ring', { c: npcAt, rad: 4.7, ph: (i / 8) * TAU, w: -0.8 });                    // a ring round the Piper
+        [sp(2.6, 12), sp(5.6, 8.5), sp(0.6, 9.5)].forEach((c) => { folk('ring', { c, rad: 0.85, ph: 0, w: 2.1 }); folk('ring', { c, rad: 0.85, ph: Math.PI, w: 2.1 }); });    // couples, turning
+        for (let i = 0; i < 3; i++) folk('ring', { c: pole, rad: 1.9, ph: (i / 3) * TAU, w: 2.7, k: 0.62 });             // children, round the pole
+        [0, 2, 3, 4].forEach((h) => folk('stand', { at: V.houses[h].door, ph: h * 1.9 }));                               // and some who only clap
+      }
       // wheat: the south field drinks from the stream, the north field from the pond
       const fields = [new Bag(), new Bag()], sAt = this.sAt;
       for (let i = 0; i < 620; i++) {
         const a = r() * TAU, d = 2 + Math.sqrt(r()) * 20.5, x = SUMMER.x + Math.cos(a) * d, z = SUMMER.z + Math.sin(a) * d, y = surfY(SUMMER, x, z);
         const near = (q, rad) => (q.x - x) ** 2 + (q.z - z) ** 2 < rad * rad;
-        if (near(springAt, 3) || near(pondAt, 5.6) || near(hut, 3.4) || near(sAt, 7) || near(npcAt, 5.5) || bed.some((q, k) => k % 2 === 0 && near(q, 1.5))) continue;
+        if (near(springAt, 3) || near(pondAt, 5.6) || near(hut, 3.4) || near(sAt, 7) || near(npcAt, 8.5) || near(V.pole, 4) || V.houses.some((h) => near(h.p, 4.6) || near(h.door, 2.2)) || V.folk.some((q) => q.c && q.rad < 1 && near(q.c, 2.6)) || bed.some((q, k) => k % 2 === 0 && near(q, 1.5))) continue;
         for (let k = 0; k < 3; k++) {
           const h = 1.0 + r() * 0.6;
           fields[z > SUMMER.z - 3 ? 0 : 1].add(daub(place(new THREE.ConeGeometry(0.075, h, 4, 1), x + (r() - 0.5) * 0.5, y + h / 2, z + (r() - 0.5) * 0.5, (r() - 0.5) * 0.3, r() * 3, (r() - 0.5) * 0.3), ['#ffffff', '#f4f0e4', '#e8e2d2'], { scale: 0.8, spread: 1 }));
         }
       }
       S.wheat = fields.map((f) => { const m = f.mesh(paintify(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x201808 }), { scale: 1.2, amp: 0.4 })); m.frustumCulled = false; scene.add(m); return m; });
-      // too much light: slice two will have something to say about this
-      const sun = glowSprite(world.glowTex, 170, 0xfff4c8, 0.9); sun.position.set(SUMMER.x - 30, SUMMER.y + 95, SUMMER.z - 270);
-      scene.add(sun);
     }
-
-    // --- what the brush is carrying: a bead of it rides on the brush
-    this.carry = null;
-    this.bead = new THREE.Group();
-    this.bead.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 1), new THREE.MeshBasicMaterial({ color: 0x8fdcff, fog: false })), glowSprite(world.glowTex, 1.7, 0x9fdcff, 0.7));
-    this.bead.visible = false;
-    scene.add(this.bead);
 
     this.mesh = bag.mesh(paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, emissive: 0x18171c }), { scale: 1.1, amp: 0.5 }));
     this.mesh.frustumCulled = false;
     scene.add(this.mesh);
     world.paintable.push(this.mesh);
 
-    // --- ground: the Flood's hill
-    const base = world.groundHeight;
-    world.groundHeight = (x, z, maxY) => {
-      const best = base(x, z, maxY), d = Math.hypot(x - FLOOD.x, z - FLOOD.z);
-      if (d > 21) return best;
-      const top = surfY(FLOOD, x, z) + hill(d);
-      return top <= maxY && top > best ? top : best;
-    };
     this._v = new V3();
   }
 
   /** Is this point in the gallery or one of its pictures? (They lie far to the east of everything else.) */
   contains(p) { return p.x > 3000; }
-  where(p) { return p.x < 3000 ? null : p.x < 5000 ? 'hall' : p.x < 7000 ? 'flood' : 'summer'; }
-  get dry() { return this.flood.level === 0; }
-  get watered() { return this.summer.spots.every((s) => s.wet); }
-  get done() { return this.dry && this.watered; }
+  where(p) { return p.x < 3000 ? null : p.x < 5000 ? 'hall' : 'tubes'; }
+  /** On the Piper's field, at the far end of the picture. */
+  onField(p) { return p.x > 7000 && (p.x - SUMMER.x) ** 2 + (p.z - SUMMER.z) ** 2 < 34 * 34 && Math.abs(p.y - SUMMER.y) < 12; }
+  /** The picture has every colour it wanted. */
+  get done() { return this.tubes.done; }
 
   /** The sky and light for where the camera is: which look, and how far along it. */
   look(p) {
     const w = this.where(p);
-    return !w ? null : w === 'hall' ? { name: this.grey ? 'grey' : 'hall', at: 0 } : w === 'flood' ? { name: 'flood', at: 1 - clamp(this.flood.wy / LEVELS[2], 0, 1) } : { name: 'summer', at: (this.summer.wetK[0] + this.summer.wetK[1]) / 2 };
+    return !w ? null : w === 'hall' ? { name: 'hall', at: this.greyK } : { name: 'tubes', at: this.tubes.eve };
   }
 
-  /** What E would do for a painter standing at `p`, if anything: step through a frame, lift something, lay it down. */
+  /** Where the next thing to do is, for the flecks that drift toward it: the frame of the picture, or the next thing to mix in it. */
+  goal(p) {
+    const w = this.where(p);
+    if (!w || this.done || this.grey || this.ended) return null;
+    return w === 'hall' ? this.hung[0].at : this.tubes.goal();
+  }
+
+  /** What E would do for a painter standing at `p`, if anything: step through a frame. */
   near(p) {
     for (const d of this.doors) if ((!d.open || d.open()) && (this.grey ? !!d.frame : !d.frame) && Math.abs(d.at.y - p.y) < 2.5 && d.at.distanceTo(p) < 3.9) return { type: 'door', door: d, text: d.text };
-    const w = this.where(p), F = this.flood;
-    if (w === 'flood') {
-      const d = Math.hypot(p.x - FLOOD.x, p.z - FLOOD.z), edge = F.level === 0 ? d > 12 && d < 21 : d > shoreR(F.wy) - 2.4;      // (with no water left, the low ground is where it goes back)
-      if (!edge || p.y > FLOOD.y + HILL + 1) return null;
-      const at = new V3(p.x, p.y + 0.8, p.z);
-      if (!this.carry && F.level > 0) return { type: 'lift', text: 'Lift the water', at };
-      if (this.carry === 'water' && F.level < 2) return { type: 'lay', text: 'Pour the water back', at };
-    }
-    if (w === 'summer') for (const s of this.summer.spots) {
-      if (s.pos.distanceTo(p) > s.reach) continue;
-      if (!this.carry && s.wet) return { type: 'lift', text: s.lift, at: s.top, spot: s };
-      if (this.carry === 'water' && !s.wet) return { type: 'lay', text: s.lay, at: s.top, spot: s };
-    }
     return null;
   }
 
@@ -610,19 +566,6 @@ export class Gallery {
     return out;
   }
 
-  /** Lift or lay, as `near` offered. Returns what happened, and the name of a picture this has just finished. */
-  act(a) {
-    const F = this.flood;
-    if (a.type === 'lift') {
-      this.carry = 'water'; this.lifts++;
-      if (a.spot) a.spot.wet = false; else F.level--;
-      return { type: 'lift', at: a.at, finished: !a.spot && F.level === 0 ? ['The Flood', 'The orchard stands on dry ground'] : null };
-    }
-    this.carry = null;
-    if (a.spot) a.spot.wet = true; else F.level++;
-    return { type: 'lay', at: a.at, finished: a.spot && this.watered ? ['High Summer', 'The field has its water'] : null };
-  }
-
   /** Something here the painter is standing by and may not understand yet: a line to say about it, once. */
   waiting(p) {
     const w = this.where(p);
@@ -635,25 +578,21 @@ export class Gallery {
       return null;
     }
     if (w === 'hall' && this.bleak) return this.empty.distanceTo(p) < 7 ? { key: 'portrait', line: 'A portrait of a painter, in pencil. Cream takes paint back to paper.' } : { key: 'colours', line: 'Thank you for the colours.' };
-    if (w === 'summer' && this.bleak) return p.distanceTo(this.summer.npcAt) < 10 ? { key: 'danced', line: 'They danced for a long time.' } : null;
+    if (this.onField(p) && this.bleak) return p.distanceTo(this.summer.npcAt) < 10 ? { key: 'danced', line: 'They danced for a long time.' } : null;
     if (w === 'hall') {
       if (this.slipped && this.odd.at.distanceTo(p) < 7) return { key: 'odd', line: 'A painting of this room. Whoever is in it is standing where you are.' };
       if (this.draped.some((q) => q.distanceTo(p) < 4.6)) return { key: 'draped', line: 'Still under its dust sheet. It has not been hung yet.' };
       if (this.empty.distanceTo(p) < 5.5) return { key: 'emptyframe', line: 'An empty frame, bigger than all the others.' };
       if (this.slipped) return { key: 'slipped', line: 'One of the dust sheets is on the floor. Nobody has been in here.' };
     }
-    if (w === 'flood' && this.flood.level === 2) return { key: 'flood', line: 'Water, almost to the top of the hill. Here the brush can lift as well as paint: go down to the water’s edge.' };
-    if (w === 'summer' && !this.watered) {
-      if (this.carry) return { key: 'wants', line: 'The brush is still holding the water. Something here is waiting for it.' };
-      if (this.summer.spots.some((s) => !s.wet && s.pos.distanceTo(p) < 9)) return { key: 'parched', line: 'Bone dry. No colour will run here: it wants real water, from somewhere that has too much.' };
-    }
     return null;
   }
 
-  save() { return { level: this.flood.level, wet: this.summer.spots.map((s) => (s.wet ? 1 : 0)), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, joined: this.joined ? 1 : 0, unpainted: this.unpainted, undone: this.undone ? 1 : 0, after: Math.min(this.after, 9), crawled: this.crawled ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
+  save() { return { tubes: this.tubes.save(), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, joined: this.joined ? 1 : 0, unpainted: this.unpainted, undone: this.undone ? 1 : 0, after: Math.min(this.after, 9), crawled: this.crawled ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
   load(d) {
     if (!d) return;
     this.slipped = !!d.slipped; this.ended = this.slipped && !!d.ended; this.grey = this.slipped && !!d.grey && !this.ended;
+    this.greyK = this.grey ? 1 : 0;
     this.taken = Number.isInteger(d.taken) && d.taken > 0 && this.slipped ? Math.min(d.taken, PAINTS.length) : 0;
     this.whole = this.ended || (this.slipped && !!d.whole);
     if (this.whole) this.wholeT = 99;
@@ -662,17 +601,12 @@ export class Gallery {
     if (this.undone) this.taken = 0;
     this.after = Number.isInteger(d.after) && d.after > 0 && this.ended ? d.after : 0;
     this.lifts = Number.isInteger(d.lifts) && d.lifts > 0 ? d.lifts : 0; this.visits = Number.isInteger(d.visits) && d.visits > 0 ? d.visits : 0;
-    const F = this.flood, S = this.summer, level = [0, 1, 2].includes(d.level) ? d.level : 2, wet = S.spots.map((_, i) => !!(d.wet && d.wet[i]));
-    const held = 2 - level - wet.filter(Boolean).length;          // there are two brushfuls in all: any that is nowhere is on the brush
-    if (held < 0 || held > 1) return;
-    F.level = level; F.wy = LEVELS[level]; F.dryK = level === 0 ? 1 : 0;
-    S.spots.forEach((s, i) => { s.wet = wet[i]; S.wetK[i] = wet[i] ? 1 : 0; });
-    S.stream.reach = S.fall.reach = wet[0] ? 1 : 0;
-    this.carry = held ? 'water' : null;
+    // (a journey saved when this level was something else, and which had got as far as the dust sheet: the picture counts as finished)
+    this.tubes.load(d.tubes, this.slipped);
   }
 
   update(dt, t, player, blots = null) {
-    const F = this.flood, S = this.summer, ease = (k) => 1 - Math.exp(-k * dt);
+    const S = this.summer, ease = (k) => 1 - Math.exp(-k * dt);
     // the sheet goes while nobody is looking; the picture under it shows whoever is in the room, from behind
     const O = this.odd, inHall = !!player && this.where(player.pos) === 'hall';
     if (!this.slipped && this.done && player && !inHall) this.slipped = true;
@@ -807,13 +741,20 @@ export class Gallery {
         if (h.seen && !seen) h.stage = Math.min(2, h.stage + 1);
         h.seen = seen;
       } else { h.stage = 0; h.seen = false; }
-      h.pic.material.map = gone ? h.greys[h.stage] : h.tex;
     }
+    // standing in front of a picture that has a name: say it (it reads the same whatever has become of its colours)
+    {
+      let name = null;
+      if (inHall && !this.grey) for (const d of this.doors) if (d.toast && d.toast[0] !== 'Varnishing Day' && d.at.distanceTo(player.pos) < 6.5) name = d.toast[0];
+      if (name !== this._facing) { this._facing = name; if (name) ev.push({ type: 'title', name }); }
+    }
+    // (as it hangs in the gallery, the picture shows how much has been mixed in it)
+    this.hung[0].pic.material.map = gone ? this.hung[0].greys[this.hung[0].stage] : this.hung[0].list[this.tubes.made];
     this.trail.visible = this.ended;
     for (const m of this.tears) m.visible = this.bleak;
-    // High Summer: the piper plays, and the companions go to the piper and stay. Afterwards, this is where they are
+    // the field: the piper plays, and the companions go to the piper and stay. Afterwards, this is where they are
     {
-      const P = S.piper, here = !!player && this.where(player.pos) === 'summer', dist = player ? player.pos.distanceTo(S.npcAt) : 99;
+      const P = S.piper, here = !!player && this.onField(player.pos), dist = player ? player.pos.distanceTo(S.npcAt) : 99;
       P.visible = !this.ended; S.hat.visible = this.ended;
       if (!this.ended) {
         // a little dance: a bob, a sway, a turn toward whoever has come
@@ -821,12 +762,33 @@ export class Gallery {
         P.rotation.z = Math.sin(t * 2.6) * 0.14;
         const want = here && dist < 14 ? Math.atan2(player.pos.x - S.npcAt.x, player.pos.z - S.npcAt.z) : Math.sin(t * 0.7) * 1.2;
         P.rotation.y += Math.atan2(Math.sin(want - P.rotation.y), Math.cos(want - P.rotation.y)) * ease(3);
-        if (here && dist < 22) { S.noteT -= dt; if (S.noteT <= 0) { S.noteT = 0.24; ev.push({ type: 'note', i: S.note++, near: clamp(1.2 - dist / 20, 0.25, 1) }); } }
-        if (here && dist < 5.5 && !this.joined && blots && blots.some((b) => b.awake)) { this.joined = true; ev.push({ type: 'join', at: S.npcAt }); }
+        if (here && dist < 26) { S.noteT -= dt; if (S.noteT <= 0) { S.noteT = 0.24; ev.push({ type: 'note', i: S.note++, near: clamp(1.2 - dist / 20, 0.25, 1) }); } }
+        if (here && dist < 13 && !this.joined && blots && blots.some((b) => b.awake)) { this.joined = true; ev.push({ type: 'join', at: S.npcAt }); }
         // the ring they dance in
         const a = t * 1.25;
         S.lead.pos.set(S.npcAt.x + Math.cos(a) * 2.3, S.npcAt.y, S.npcAt.z + Math.sin(a) * 2.3);
         S.lead.vel.set(-Math.sin(a) * 2.9, 0, Math.cos(a) * 2.9); S.lead.heading = Math.atan2(S.lead.vel.x, S.lead.vel.z);
+      }
+      // the village: everybody dancing, in time with the Piper. Afterwards they are where they fell, and the lights are out
+      {
+        const V = S.village;
+        V.windows.visible = !this.ended; for (const b of V.bulbs) b.visible = !this.ended;
+        if (this.ended && !V.down) {
+          V.down = true;
+          for (const q of V.folk) { q.m.rotation.set(0, q.i * 1.3, 1.45); q.m.position.y = surfY(SUMMER, q.m.position.x, q.m.position.z) + 0.34 * q.k; }
+        }
+        if (!this.ended) for (const q of V.folk) {
+          const hop = Math.abs(Math.sin(t * 5.2 + q.i * 0.9)), m = q.m;
+          if (q.kind === 'ring') {
+            const a = q.ph + t * q.w, x = q.c.x + Math.cos(a) * q.rad, z = q.c.z + Math.sin(a) * q.rad;
+            m.position.set(x, surfY(SUMMER, x, z) + hop * 0.3 * q.k, z);
+            // (a couple face each other; a ring faces the way it goes)
+            m.rotation.set(0, q.rad < 1 ? Math.atan2(-Math.cos(a), -Math.sin(a)) : Math.atan2(-Math.sin(a) * q.w, Math.cos(a) * q.w), Math.sin(t * 2.6 + q.i) * 0.12);
+          } else {
+            m.position.set(q.at.x, surfY(SUMMER, q.at.x, q.at.z) + hop * 0.16, q.at.z);
+            m.rotation.set(0, Math.atan2(S.npcAt.x - q.at.x, S.npcAt.z - q.at.z) + Math.sin(t * 0.9 + q.ph) * 0.4, Math.sin(t * 2.6 + q.ph) * 0.1);
+          }
+        }
       }
       if (blots) {
         let n = 0;
@@ -850,7 +812,7 @@ export class Gallery {
         }
       }
     }
-    if (this.ended && player && this.where(player.pos) === 'summer') {
+    if (this.ended && player && this.onField(player.pos)) {
       const dist = player.pos.distanceTo(S.npcAt), C = S.crawl, b = C.b;
       // the tune is still here, running down, until the painter is close enough to see why
       if (this.bleak && dist > 6.5 && dist < 26) { S.noteT -= dt; if (S.noteT <= 0) { S.noteT = 0.5 + Math.random() * 0.4; ev.push({ type: 'dirge', i: S.note++ }); } }
@@ -878,12 +840,9 @@ export class Gallery {
     }
     this.pageDoor.visible = this.lastpage.done;
     this.homeDoor.visible = this.found; this.homeCol.r = this.found ? 1.7 : -1;
-    // the Flood: the water finds its level; the orchard flowers once it stands on dry ground
-    F.wy += (LEVELS[F.level] - F.wy) * ease(1.1);
-    F.water.position.y = FLOOD.y + F.wy; F.water.visible = F.wy > -0.45;
-    F.dryK += ((F.level === 0 ? 1 : 0) - F.dryK) * ease(0.5);
-    F.crownMat.color.setRGB(0.52 + 0.48 * F.dryK, 0.62 + 0.1 * F.dryK, 0.56 + 0.26 * F.dryK);
-    // High Summer: water where it was laid
+    // (the colour goes out of the room slowly, when it goes)
+    this.greyK += ((this.grey ? 1 : 0) - this.greyK) * ease(this.grey ? 0.3 : 4);
+    // the field: its stream, its pond, its mill
     const run = (st, goal, rate) => {
       st.reach = st.reach < goal ? Math.min(goal, st.reach + dt * rate) : Math.max(goal, st.reach - dt * rate * 1.6);
       st.mat.uniforms.reach.value = st.reach; st.mesh.visible = st.reach > 0.001;
@@ -894,19 +853,10 @@ export class Gallery {
       S.wetK[i] += ((s.wet ? 1 : 0) - S.wetK[i]) * ease(0.6);
       s.pool.material.color.setRGB(0.6 - 0.26 * S.wetK[i], 0.52 + 0.22 * S.wetK[i], 0.38 + 0.52 * S.wetK[i]);
       s.glint.material.opacity = s.wet ? 0 : 0.24 + Math.sin(t * 1.5 + i) * 0.1;
-      S.wheat[i].material.color.setRGB(0.92 - 0.2 * S.wetK[i], 0.82 + 0.02 * S.wetK[i], 0.5 - 0.1 * S.wetK[i]);
+      S.wheat[i].material.color.setRGB(1.0, 0.94 - 0.04 * S.wetK[i], 0.9 - 0.06 * S.wetK[i]);          // (pale, as everything that grows here is)
     });
     S.spin += ((S.spots[1].wet ? 1.6 : 0) - S.spin) * ease(1.2);
     S.wheel.rotation.z -= S.spin * dt;
 
-    this.bead.visible = !!this.carry && !!player;
-    if (!player) return;
-    if (this.carry) { player.model.backTip.getWorldPosition(this.bead.position); this.bead.position.y += 0.28 + Math.sin(t * 3) * 0.04; }
-    // standing water is in the way: it will not be waded into past the ankles
-    const p = player.pos;
-    if (F.wy > 0.05 && player.grounded && this.where(p) === 'flood' && p.y < FLOOD.y + F.wy + 0.5) {
-      const dx = p.x - FLOOD.x, dz = p.z - FLOOD.z, d = Math.hypot(dx, dz), lim = shoreR(F.wy) + 0.7;
-      if (d > lim) { const nd = Math.max(lim, d - 12 * dt); p.x = FLOOD.x + (dx / d) * nd; p.z = FLOOD.z + (dz / d) * nd; }
-    }
   }
 }

@@ -92,7 +92,7 @@ export class Sound {
   hush(k) {
     if (k === (this.hushK ?? 1)) return;
     this.hushK = k;
-    if (this.music) this.music.gain.setTargetAtTime(1.25 * this.musicVol * k, this.ctx.currentTime, 0.9);
+    if (this.music) this.music.gain.setTargetAtTime(1.25 * this.musicVol * k, this.ctx.currentTime, k === 0 ? 2.6 : 0.9);          // (silence comes on slowly)
   }
 
   /** How fast the painter is moving through the air, 0..1: drives the bed of wind. */

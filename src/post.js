@@ -114,6 +114,8 @@ uniform vec2 texel;
 uniform float relief;
 uniform float sat;
 uniform float keepRed;    // 0..1: when the colour is gone, whatever is marked as blood keeps its own
+uniform vec3 wash;        // a picture painted with one colour: this colour...
+uniform float washK;      // ...and how completely (1: every tone in it is a shade of that colour)
 uniform sampler2D tScene; // the scene as it was drawn: blood is the one thing in it that writes no alpha
 uniform float flash;
 uniform vec3 tint;
@@ -157,9 +159,11 @@ void main() {
   }
   float l = lum(c);
   c = mix(vec3(l), c, sat);
-  // (a mark, not a colour: a red tree is not blood, and a thin streak of blood far away is still blood)
-  float blood = keepRed * clamp(1.0 - texture2D(tScene, vUv).a, 0.0, 1.0);
-  c = mix(c, vec3(0.80, 0.02, 0.04) * (0.5 + 0.9 * l), blood);
+  c = mix(c, wash * (0.22 + 1.2 * lum(c)), washK);
+  // (a mark, not a colour: whatever wrote no alpha into the scene keeps the colour it was drawn in. Blood, when
+  // there is no other colour; and what the brush is carrying, in a picture that has only one)
+  vec4 own = texture2D(tScene, vUv);
+  c = mix(c, pow(max(own.rgb, 0.0), vec3(1.0 / 2.2)), keepRed * clamp(1.0 - own.a, 0.0, 1.0));
   c = (c - 0.5) * 1.07 + 0.5;
   vec2 v = vUv - 0.5;
   c *= 1.0 - dot(v, v) * 0.38;                   // vignette
@@ -175,6 +179,7 @@ export class Painterly {
     this.flash = 0;
     this.sat = 1.22;
     this.keepRed = 0;
+    this.wash = new THREE.Color(1, 1, 1); this.washK = 0;          // a single colour laid over the whole picture, and how strongly
     this.bloom = 1;
     this.ink = 0;           // 0..1: pencil outlines over the picture (the Underpainting is drawn, not painted)
     this.sharp = 0;         // 1: things keep their detail with distance (the knife narrows the further off it works)
@@ -195,7 +200,7 @@ export class Painterly {
     this.matBlur = pass(BLUR, { dir: { value: new THREE.Vector2() } });
     this.matFinal = new THREE.ShaderMaterial({
       uniforms: {
-        tK: { value: null }, tScene: { value: null }, texel: { value: new THREE.Vector2() }, tBloom: { value: null }, bloom: { value: 1 },
+        tK: { value: null }, tScene: { value: null }, wash: { value: new THREE.Color(1, 1, 1) }, washK: { value: 0 }, texel: { value: new THREE.Vector2() }, tBloom: { value: null }, bloom: { value: 1 },
         relief: { value: 1 }, sat: { value: 1.2 }, keepRed: { value: 0 }, flash: { value: 0 }, tint: { value: new THREE.Color(1, 1, 1) },
         tDepth: { value: null }, clip: { value: new THREE.Vector2(0.3, 2600) }, ink: { value: 0 },
       },
@@ -255,7 +260,7 @@ export class Painterly {
     }
     const u = this.matFinal.uniforms;
     u.tBloom.value = bA.texture; u.bloom.value = this.bloom;
-    u.tK.value = src; u.tScene.value = this.rtScene.texture;
+    u.tK.value = src; u.tScene.value = this.rtScene.texture; u.wash.value.copy(this.wash); u.washK.value = this.washK;
     u.relief.value = this.mode === 0 ? 0.0 : this.mode === 1 ? 1.0 : 1.5;
     u.sat.value = this.sat; u.keepRed.value = this.keepRed;
     u.tDepth.value = this.rtScene.depthTexture; u.clip.value.set(camera.near, camera.far); u.ink.value = this.ink;

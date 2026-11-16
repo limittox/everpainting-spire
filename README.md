@@ -53,14 +53,23 @@ It ends on the Blank Page, where four wells each want one of the four, under the
 
 You reach it by stepping into the unfinished canvas in the Spire's atelier, after the ending. To try it straight away, add `?underpainting` to the address.
 
-### Varnishing Day (in progress)
+### Varnishing Day
 
-A third level is being built: the gallery where the painting hangs, the day before the doors open. The pictures on its walls are nearly finished. Each has too much of one thing and not enough of another, and here the brush learns to carry: stand by something, press E to lift it, and lay it down in another picture.
+The third level: the gallery where the painting hangs, the day before the doors open. One picture on its walls can be stepped into.
 
-- **The Flood**: a drowned orchard. Lift the water and the ground comes back, ring by ring.
-- **High Summer**: a parched field with a dry spring and a dry mill pond, each waiting for a brushful.
+**Three Tubes** was painted with three tubes of paint: red, yellow and blue. Inside it those are all your brush has, and anything else has to be mixed, by painting one colour over another. The place is a violet night with a great moon in it: islands of dark crystal, trees that give off their own light, water going over every edge, arches and banners, and a road of every colour wound through it all.
 
-The brush holds one thing at a time, and anything laid down can be lifted again. You reach the gallery through a frame that stands on the Blank Page once the Underpainting is finished; after that a frame in the atelier leads straight there. To try it straight away, add `?gallery` to the address.
+- **Blue and yellow make green**, and green grows: a sketched seed sends a vine across a gap.
+- **Red and yellow make orange**, and orange warms: a sketched lamp lights, and its warm air lifts you.
+- **Red and blue make violet**, and violet brings the evening, and paths of light that are only there at night.
+
+Each sketch glows faintly in the colour it wants. A wrong mixture stays until Cream wipes it clean.
+
+The way through it is a climb. A vine leads from the first island up to a gate; from the gate the road of every colour runs down and round, to be skated; at its foot stands an observatory, rings turning about its head, and stones hang round it in a rising spiral, to be climbed by jumping (the beads of light on two of them throw you up). From its roof, warm air carries you on.
+
+There the picture stops explaining itself: the hour is yours to set, some things only stand by day and others only in the evening, and the way on needs both. At the far end is a village with its lights strung up, a piper, and everybody out dancing.
+
+You reach the gallery through a frame that stands on the Blank Page once the Underpainting is finished; after that a frame in the atelier leads straight there. To try it straight away, add `?gallery` to the address. What happens once the picture is finished is best found out by playing.
 
 ## Running it yourself
 
@@ -107,7 +116,7 @@ The game is written in plain JavaScript with [three.js](https://threejs.org/) an
 | `src/sketches.js`, `src/setpieces.js`, `src/secrets.js` | Sketches, the island set-pieces and the hidden places |
 | `src/interior.js`, `src/sights.js` | Inside the Spire, and the far-off sights |
 | `src/underpainting.js`, `src/seedbed.js`, `src/lastpage.js` | The second level: running water, growing vines, warm air, and its ending |
-| `src/gallery.js` | The third level: the gallery, its pictures, and lifting and carrying |
+| `src/gallery.js`, `src/tubes.js` | The third level: the gallery, and the picture in it where colours are mixed |
 | `src/day.js`, `src/audio.js` | Time of day; music and sound |
 | `src/hud.js`, `src/settings.js`, `src/save.js` | On-screen prompts and map, the settings panel, and storage |
 | `src/util.js` | Shared helpers: palettes, noise, stroke geometry |

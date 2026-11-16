@@ -43,8 +43,10 @@ export function createHud(world) {
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => toast.classList.remove('on'), ms);
     },
-    hint(html, ms = 6500) {
+    /** One line at the bottom. `loud`: an instruction, or somebody speaking, in a panel of its own. */
+    hint(html, ms = 6500, loud = false) {
       hintEl.innerHTML = html;
+      hintEl.classList.toggle('loud', loud);
       hintEl.classList.add('on');
       clearTimeout(hintTimer);
       hintTimer = setTimeout(() => hintEl.classList.remove('on'), ms);

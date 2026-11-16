@@ -120,9 +120,9 @@ export class Seedbed {
   }
 
   /** A vine along `pts`: a sketched trellis until it grows, then a walkable stroke of green, like the bridges. */
-  makeVine(pts, hw, seconds) {
+  makeVine(pts, hw, seconds, pal = VINE) {
     const scene = this.scene, N = pts.length - 1;
-    const geo = strokeGeo(pts, { width: hw * 2, lanes: 5, palette: VINE, dripPalette: VINE, drips: 0.5, run: 9 });
+    const geo = strokeGeo(pts, { width: hw * 2, lanes: 5, palette: pal, dripPalette: pal, drips: 0.5, run: 9 });
     const mesh = new THREE.Mesh(geo, this.vineMat); mesh.frustumCulled = false;
     const ghost = new THREE.Mesh(strokeGeo(pts, { width: hw * 1.4, lanes: 2, palette: ['#ffffff'], bump: 0 }), ghostMaterial(this.uTime));
     ghost.frustumCulled = false; ghost.renderOrder = 3;
