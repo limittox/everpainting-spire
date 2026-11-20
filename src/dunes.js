@@ -193,7 +193,36 @@ export class Dunes {
     // ================================================================================== statues, sunk in the sand
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler();
     /** Stand a thing made at the origin somewhere: so big, turned so, tipped so. Gives back where a point of it ended up. */
-    const set = (parts, p, s, yaw = 0, tipX = 0, tipZ = 0) => { M.compose(p, Q.setFromEuler(E.set(tipX, yaw, tipZ, 'YXZ')), new V3(s, s, s)); for (const [g, pal] of parts) add(g.applyMatrix4(M), pal); return (x, y, z) => new V3(x, y, z).applyMatrix4(M); };
+    /**
+     * Make a piece of stone (already where it is to stand) solid: its top is a floor, and its sides are in the way. A block
+     * is fitted along its length with a row of circles; anything round gets one. What the sand covers is left out, and
+     * what barely shows above it is only a floor, to be stepped onto.
+     */
+    const solid = (g) => {
+      const q = g.attributes.position, t = new V3(), mean = (i0, n) => { const v = new V3(); for (let i = i0; i < i0 + n; i++) v.add(t.fromBufferAttribute(q, i)); return v.divideScalar(n); };
+      const P = mean(0, q.count), N = new V3(0, 1, 0); let A, B;
+      if (g.type === 'BoxGeometry') {
+        // (a box keeps its corners in six fours, a face each: from them its three half-lengths, the most upright first. Its
+        // top is the face that way: P is the middle of it, N which way it faces, and it may well be tipped.)
+        const ax = [0, 8, 16].map((i) => mean(i, 4).sub(mean(i + 4, 4)).multiplyScalar(0.5)).sort((u, v) => Math.abs(v.y) / v.length() - Math.abs(u.y) / u.length());
+        if (ax[0].y < 0) ax[0].negate();
+        P.add(ax[0]); N.copy(ax[0]).normalize(); [A, B] = [ax[1].setY(0), ax[2].setY(0)].sort((u, v) => v.length() - u.length());
+      } else {
+        g.computeBoundingBox(); const b = g.boundingBox, r = ((b.max.x - b.min.x + b.max.z - b.min.z) / 4) * 0.92;
+        P.set((b.min.x + b.max.x) / 2, b.max.y, (b.min.z + b.max.z) / 2); A = new V3(r, 0, 0); B = new V3(0, 0, r);
+      }
+      const la = A.length(), lb = B.length(), cs = A.x / la, sn = A.z / la, top = (dx, dz) => P.y - (N.x * dx + N.z * dz) / N.y;
+      if (lb < 0.25 || P.y + (Math.hypot(N.x, N.z) / N.y) * la < duneH(P.x, P.z) + 0.1) return;
+      decks.push((x, z) => { const dx = x - P.x, dz = z - P.z; return Math.abs(dx * cs + dz * sn) < la && Math.abs(dz * cs - dx * sn) < lb ? top(dx, dz) : null; });
+      // (a tipped top is as high as it is where the painter is: so nobody stood on the low side of it is in the way of it)
+      const n = Math.max(1, Math.ceil((2 * (la - lb)) / lb) + 1), roof = (x, z) => top(x - P.x, z - P.z);
+      for (let i = 0; i < n; i++) {
+        const k = n > 1 ? ((i / (n - 1)) * 2 - 1) * (la - lb) : 0, x = P.x + cs * k, z = P.z + sn * k, y = top(cs * k, sn * k);
+        if (y > duneH(x, z) + 0.75) world.colliders.push({ x, z, r: lb, top: y, roof, late: true });          // (lower than that it is stepped onto, not walked into)
+      }
+    };
+    const hard = (g, pal) => { solid(g); add(g, pal); };
+    const set = (parts, p, s, yaw = 0, tipX = 0, tipZ = 0, firm = false) => { M.compose(p, Q.setFromEuler(E.set(tipX, yaw, tipZ, 'YXZ')), new V3(s, s, s)); for (const [g, pal] of parts) { g.applyMatrix4(M); if (firm) solid(g); add(g, pal); } return (x, y, z) => new V3(x, y, z).applyMatrix4(M); };
     // a seated figure, twenty high from the foot of its seat to its crown
     const guardian = (arms = 3) => [
       [box(5, 6, 4, 0, 3, -1), STONE], [box(5.6, 0.7, 4.6, 0, 6.2, -1), STONE],
@@ -227,29 +256,33 @@ export class Dunes {
     ];
     // an avenue of them, either side of the way to the tower, each pair deeper in than the last
     for (const [dz, deep, tip] of [[40, 6, 0], [21, 10, 0.05], [3, 13, -0.09]]) for (const k of [-1, 1]) {
-      const p = sandAt(k * 13, dz, -deep * 0.9), spot = set(guardian(k < 0 && dz < 30 ? 2 : 3), p, 0.9, -k * 1.15, tip * k, tip);
-      world.colliders.push({ x: p.x, z: p.z + 0.5, r: 3.4, top: p.y + 18.6, late: true });
+      const p = sandAt(k * 13, dz, -deep * 0.9), spot = set(guardian(k < 0 && dz < 30 ? 2 : 3), p, 0.9, -k * 1.15, tip * k, tip, true);
       const bowl = spot(0, 9, 2.5); if (bowl.y > duneH(bowl.x, bowl.z) + 0.4) fire(bowl, 5);
     }
     {
       // a head, thrown back, the sand to its lips on one side
       const p = sandAt(-34, 12, 2.6); set(head(), p, 7.5, 0.9, -0.5, 0.22);
-      world.colliders.push({ x: p.x, z: p.z, r: 6.4, top: p.y + 9.5, late: true });
+      // (it is an egg lying tipped in the sand, and no upright drum fits that: so its own shape is asked. The crown of it
+      // is a floor wherever it is not too steep to stand, and whoever is inside the rest of it is put out sideways.)
+      const Ei = M.clone().scale(new V3(0.86, 1.12, 0.96)).invert(), up = new V3().setFromMatrixColumn(Ei, 1), Nt = new THREE.Matrix3().setFromMatrix4(Ei).transpose(), a = new V3(), u = new V3();
+      decks.push((x, z) => {
+        a.set(x, 0, z).applyMatrix4(Ei); const ab = a.dot(up), bb = up.dot(up), D = ab * ab - bb * (a.dot(a) - 1); if (D < 0) return null;
+        const y = (-ab + Math.sqrt(D)) / bb, ny = u.copy(a).addScaledVector(up, y).dot(up);
+        return ny / u.applyMatrix3(Nt).length() > 0.55 ? y : null;
+      });
+      this.headOut = (q) => { for (let i = 0; i < 4; i++) { const F = u.set(q.x, q.y + 0.9, q.z).applyMatrix4(Ei).length(); if (F >= 1) return; u.applyMatrix3(Nt); const l = Math.hypot(u.x, u.z) || 1; q.x += (u.x / l) * (1 - F) * 6; q.z += (u.z / l) * (1 - F) * 6; } };
       // a hand reaching out of a dune, big enough to stand in
-      const q = sandAt(29, 27, 2.3), palm = set(hand(), q, 3.1, -0.7, -0.12, 0.08)(0, 0.26, 0);
-      disc(palm, 3.2);
-      world.colliders.push({ x: q.x, z: q.z, r: 2.6, top: palm.y - 0.1, late: true });
+      const q = sandAt(29, 27, 2.3), palm = set(hand(), q, 3.1, -0.7, -0.12, 0.08, true)(0, 0.26, 0);
       this.palm = palm;
     }
     // pillars along the avenue, most of them broken; and their drums lying about
     for (const [dx, dz, h] of [[-7, 50, 7.5], [7, 50, 4.2], [-7.5, 31, 3.2], [7.5, 31, 9], [-8, 12, 5.6], [8, 12, 2.4]]) {
       const p = sandAt(dx, dz, -1);
-      add(place(new THREE.CylinderGeometry(0.95, 1.05, h + 1, 10), p.x, p.y + (h + 1) / 2, p.z, 0, dx, 0.04));
-      add(place(new THREE.CylinderGeometry(1.3, 1.3, 0.5, 10), p.x, p.y + 1.4, p.z));
-      if (h > 6) add(box(2.8, 0.7, 2.8, p.x, p.y + h + 1.2, p.z, 0, dx));
-      world.colliders.push({ x: p.x, z: p.z, r: 1.2, top: p.y + h + 1.6, late: true });
+      hard(place(new THREE.CylinderGeometry(0.95, 1.05, h + 1, 10), p.x, p.y + (h + 1) / 2, p.z, 0, dx, 0.04));
+      hard(place(new THREE.CylinderGeometry(1.3, 1.3, 0.5, 10), p.x, p.y + 1.4, p.z));
+      if (h > 6) hard(box(2.8, 0.7, 2.8, p.x, p.y + h + 1.2, p.z, 0, dx));
     }
-    for (const [dx, dz, turn] of [[11, 44, 0.4], [-12, 26, 1.9], [15, 16, 1.1], [-21, 44, 0.2], [24, 6, 2.6]]) { const p = sandAt(dx, dz, 0.35); add(place(new THREE.CylinderGeometry(1.0, 1.0, 2.2, 10), p.x, p.y, p.z, 0, turn, Math.PI / 2 - 0.12)); }
+    for (const [dx, dz, turn] of [[11, 44, 0.4], [-12, 26, 1.9], [15, 16, 1.1], [-21, 44, 0.2], [24, 6, 2.6]]) { const p = sandAt(dx, dz, 0.35); hard(place(new THREE.CylinderGeometry(1.0, 1.0, 2.2, 10), p.x, p.y, p.z, 0, turn, Math.PI / 2 - 0.12)); }
 
     // ================================================================================== the chains
     // Four chains of stone held the island to the desert under it. Three have parted: what is left of them hangs from
@@ -784,7 +817,8 @@ export class Dunes {
       this.uLow.value.set(m.x0 - X0, m.z0 - Z0, m.size);
     }
 
-    // ---- the tower is in the way, at whatever height the painter is; and the needle, on the roof
+    // ---- the tower is in the way, at whatever height the painter is; and the needle, on the roof; and the great head in the sand
+    this.headOut(p);
     if (h > -2 && h < TOP - 0.1) { const dx = p.x - ax(h), dz = p.z - az(h), d = Math.hypot(dx, dz) || 1, need = wall(h) + 0.45; if (d < need) { p.x = ax(h) + (dx / d) * need; p.z = az(h) + (dz / d) * need; } }
     if (h > TOP - 0.5 && h < PERCH + 2) { const dx = p.x - this.needle.x - LX * (h - TOP), dz = p.z - this.needle.z, d = Math.hypot(dx, dz) || 1; if (d < 1.75) { p.x += (dx / d) * (1.75 - d); p.z += (dz / d) * (1.75 - d); } }
 
@@ -887,9 +921,9 @@ export class Dunes {
       if (h > -6) this.up = this.open = true;          // (whoever stands on the island has no more use for the gate, however they came)
       else if (this.below) { if (this.up && landed && this.fall > 26 && !glided && !this.done) { player.safe.copy(this.head); player.floatBack(); ev.push({ type: 'back' }); } else this.up = false; }
     }
-    // the drum throws up whoever lands on it
-    if (player.grounded && Math.abs(p.y - this.drumAt.y) < 0.3 && (p.x - this.drumAt.x) ** 2 + (p.z - this.drumAt.z) ** 2 < 2.2) {
-      player.vel.y = 26; player.grounded = false; player.jumps = 1; player.airTime = 1; this.drumT = 1;
+    // the drum throws up whoever lands on it, or walks into it from the platform it stands on (its skin is too high to step onto: without this they would stand inside it)
+    if (player.grounded && p.y > this.drumAt.y - 1 && p.y < this.drumAt.y + 0.3 && (p.x - this.drumAt.x) ** 2 + (p.z - this.drumAt.z) ** 2 < 2.3) {
+      p.y = Math.max(p.y, this.drumAt.y); player.vel.y = 26; player.grounded = false; player.jumps = 1; player.airTime = 1; this.drumT = 1;
       ev.push({ type: 'drum', at: this.drumAt });
     }
     this.drumT = Math.max(0, this.drumT - dt * 1.6);

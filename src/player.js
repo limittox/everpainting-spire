@@ -209,7 +209,8 @@ export class Player {
 
     // obstacles
     for (const c of world.colliders) {
-      if (c.top !== undefined && this.pos.y >= c.top) continue;        // above it: nothing in the way
+      const top = c.roof ? c.roof(this.pos.x, this.pos.z) : c.top;          // (some tops are tipped: how high, just here)
+      if (top !== undefined && Math.max(y0, this.pos.y) >= top - 0.05) continue;        // above it, or was as this step began: nothing in the way (so what has a floor on top is landed on, not slid off)
       const dx = this.pos.x - c.x, dz = this.pos.z - c.z, rr2 = c.r + this.radius;
       const d2 = dx * dx + dz * dz;
       if (d2 < rr2 * rr2 && d2 > 1e-6) {
