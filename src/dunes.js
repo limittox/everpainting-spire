@@ -253,14 +253,17 @@ export class Dunes {
     // ================================================================================== the chains
     // Four chains of stone held the island to the desert under it. Three have parted: what is left of them hangs from
     // the rim, and the rest lies in the sand by the posts it was made fast to. The fourth still goes down to the top
-    // of a great dune, and its links are broad enough to walk up.
-    const chain = (a, b) => {
+    // of a great dune, and its links are broad enough to walk up. Its blue tiles wake as the painter comes up over them:
+    // each one lights, and lends a push that the next one adds to.
+    const shines = []; this.tiles = []; this.surge = 0; this.chainF = 2;
+    const glow = (w, d, y, map) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(0, y, 0), new THREE.MeshBasicMaterial({ color: 0x7ff2ff, map, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); m.applyMatrix4(M); scene.add(m); shines.push(m); return m; };
+    const chain = (a, b, walked) => {
       const n = Math.max(1, Math.round(a.distanceTo(b) / 7));
       for (let i = 0; i < n; i++) {
         M.lookAt(a, b, UP).setPosition(a.clone().lerp(b, (i + 0.5) / n));          // (its own z down the chain, its own y out of the top of it)
         const link = (g, pal) => add(g.applyMatrix4(M), pal);
         link(box(5, 0.9, 6.5, 0, -0.45, 0)); for (const k of [-1, 1]) link(box(0.55, 0.6, 6.5, k * 2.5, -0.05, 0));
-        if (i % 3 === 1) link(box(2.4, 0.1, 3.4, 0, 0.01, 0), TILE);
+        if (i % 3 === 1) { if (walked) this.tiles.push({ f: (i + 0.5) / n, lit: false, k: 0, plate: glow(2.4, 3.4, 0.09), halo: glow(9, 11, 0.13, world.glowTex) }); link(box(2.4, 0.1, 3.4, 0, 0.01, 0), TILE); }
         if (i < n - 1) for (const k of [-1, 1]) link(place(new THREE.TorusGeometry(1.7, 0.42, 5, 12), k * 1.5, -2.0, -3.5, 0, Math.PI / 2, 0), ROCK);
       }
     };
@@ -268,7 +271,7 @@ export class Dunes {
     /** A slope to stand on, from a up to b, `hw` to either side. */
     const ramp = (a, b, hw) => { const ex = b.x - a.x, ez = b.z - a.z, L = Math.hypot(ex, ez); decks.push((x, z) => { const s = ((x - a.x) * ex + (z - a.z) * ez) / L; return s > -0.5 && s < L + 0.5 && Math.abs((z - a.z) * ex - (x - a.x) * ez) / L < hw ? a.y + ((b.y - a.y) * clamp(s, 0, L)) / L : null; }); };
     this.foot = lowAt(FOOT[0], FOOT[1], 0.3); this.head = new V3(START.x, duneH(START.x, START.z) + 0.2, START.z);
-    chain(this.foot, this.head); ramp(this.foot, this.head, 2.3); posts(this.foot, CH);
+    chain(this.foot, this.head, true); ramp(this.foot, this.head, 2.3); posts(this.foot, CH);
     for (const [th, len] of [[deg(170), 46], [deg(262), 30], [deg(338), 58]]) {
       const r = rimR(isl, th), o = new V3(Math.cos(th), 0, Math.sin(th)), a = new V3(X0, Y0 - 3, Z0).addScaledVector(o, r - 1.5);
       chain(a.clone().addScaledVector(o, 3).setY(a.y - len), a);
@@ -474,7 +477,7 @@ export class Dunes {
     }
     this.mesh = bag.mesh(stoneMat()); this.mesh.material.side = THREE.DoubleSide; this.mesh.frustumCulled = false;
     scene.add(this.mesh);
-    this.all = [this.sand, this.lowSand, this.tower, this.mesh, this.ring, this.drum];          // (not drawn while the painter is somewhere else)
+    this.all = [this.sand, this.lowSand, this.tower, this.mesh, this.ring, this.drum, ...shines];          // (not drawn while the painter is somewhere else)
 
     // a mirage: an oasis in a pan of sand off to the right of the way down. Water with the sky in it, palms on an islet
     // in the middle, reeds along the shore. The palms are really there, and the grass under them; the water is not. It is
@@ -729,7 +732,7 @@ export class Dunes {
     this.below = h < -8 && p.y - under < 4;          // (down in the open desert, and not on the chain up out of it)
     // (stepping in: it is noon again, whatever hour it was left at; and nothing has crossed the sand down here)
     if (!this.was) {
-      this.was = true; this.far = 0; this.day = 0; this.from = 0; this.glid = false; this.up = false; this.wasGround = true;
+      this.was = true; this.far = 0; this.day = 0; this.from = 0; this.glid = false; this.up = false; this.wasGround = true; this.surge = 0; this.chainF = 2; for (const q of this.tiles) q.lit = false;
       const m = this.low; m.c.fillStyle = GREY; m.c.fillRect(0, 0, 1024, 1024); m.x0 = p.x - m.size / 2; m.z0 = p.z - m.size / 2; m.dirty = true;
     }
     // ---- the open desert has an end, though not one that can be seen: the painter is turned back there
@@ -759,6 +762,19 @@ export class Dunes {
     {
       const fade = smooth((Math.hypot(p.x - this.mirageAt.x, p.z - this.mirageAt.z) - 48) / 165) * (1 - smooth((this.day - 0.1) / 0.12));
       this.mirage.visible = fade > 0.01; this.uFade.value = fade; this.uCamL.value.set(camera.position.x - X0, camera.position.y, camera.position.z - Z0);
+    }
+
+    // ---- the chain's blue tiles: each lights as the painter comes up over it, and pushes; the push fades between them, so a run of them builds
+    {
+      const a = this.foot, b = this.head, ex = b.x - a.x, ez = b.z - a.z, L2 = ex * ex + ez * ez, f = ((p.x - a.x) * ex + (p.z - a.z) * ez) / L2, off = p.y - a.y - (b.y - a.y) * f;
+      const on = f > 0 && f < 1 && Math.abs((p.z - a.z) * ex - (p.x - a.x) * ez) < 2.8 * Math.sqrt(L2) && off > -1 && off < 5;
+      this.tiles.forEach((q, i) => {
+        if (on && this.chainF < q.f && f >= q.f) { q.lit = true; q.k = 1; this.surge = Math.min(this.surge + 9, 15); ev.push({ type: 'tile', at: q.plate.position, n: i }); }
+        q.k *= Math.exp(-2.5 * dt);
+        q.plate.material.opacity = q.lit ? 0.5 + 0.5 * q.k + 0.08 * Math.sin(t * 3 + i * 1.7) : 0; q.halo.material.opacity = q.lit ? 0.22 + 0.78 * q.k : 0;
+      });
+      this.chainF = on ? f : 2;
+      this.surge *= Math.exp(-(on ? 0.6 : 3) * dt); if (this.surge > 0.5) player.rush = Math.max(player.rush, this.surge);          // shortcut: capped at 15 so a slow frame's step still fits the painter's step-up; raise both together
     }
 
     // ---- the sand takes the mark of what crosses it

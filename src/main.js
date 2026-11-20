@@ -1431,6 +1431,7 @@ function tick(dt) {
     if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
     else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
     else if (ev.type === 'back') sound.play('wind');
+    else if (ev.type === 'tile') { sound.chime(ev.n); sound.whoosh(500, 1900, 0.3, 0.1); fx.burst(ev.at, 22, { speed: 4.5, up: 6, colors: ['#8ff6ff', '#58d0c0', '#ffffff'], size: 0.34, life: 0.9, gravity: 6, boost: 1.4 }); }
     else if (ev.type === 'drum') { sound.play('jump'); sound.whoosh(120, 60, 0.35, 0.3, 0.9); fx.burst(ev.at, 24, { speed: 5, up: 6, colors: DUST, size: 0.34, life: 0.8, gravity: 9 }); }
     else if (ev.type === 'survey' && game.state === 'play') { game.survey = true; game.surveyT = 0; game.surveyA = Math.atan2(camera.position.x - player.pos.x, camera.position.z - player.pos.z); sound.play('vista'); sound.play('wings'); sound.whoosh(260, 900, 2.6, 0.12, 0.7); hud.prompt(null); hud.clearHint(); }
   }
