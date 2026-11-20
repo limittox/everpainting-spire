@@ -57,7 +57,7 @@ You reach it by stepping into the unfinished canvas in the Spire's atelier, afte
 
 The third level: the gallery where the painting hangs, the day before the doors open. One picture on its walls can be stepped into.
 
-**Three Tubes** was painted with three tubes of paint: red, yellow and blue. Inside it those are all your brush has, and anything else has to be mixed, by painting one colour over another. The place is a violet night with a great moon in it: islands of dark crystal, trees that give off their own light, water going over every edge, arches and banners, and a road of every colour wound through it all.
+**Three Tubes** was painted with three tubes of paint: red, yellow and blue. Inside it those are all your brush has, and anything else has to be mixed, by painting one colour over another. The place is a violet night with a great moon in it and a serpent of rock asleep round the moon: islands of dark crystal, trees that give off their own light, water going over every edge, arches and banners, and a road of every colour wound through it all. Three shoals of koi, one of each tube's colour, swim the air between the islands and keep whatever is painted over them. Paper moths hang over the flowers until they are given a colour, and then go to fly round the rings of the observatory. Fireworks go up over the far end of the picture from the moment you arrive. There is a telescope on the observatory's roof, trained on the serpent, which can be turned to look at anything else.
 
 - **Blue and yellow make green**, and green grows: a sketched seed sends a vine across a gap.
 - **Red and yellow make orange**, and orange warms: a sketched lamp lights, and its warm air lifts you.

@@ -210,6 +210,7 @@ addEventListener('mousemove', (e) => {
   if (game.state !== 'play') return;
   if (document.pointerLockElement === canvas || dragging) {
     const look = settings.values.look;
+    if (game.scope) { scopeLook(mx * 0.0026 * look, my * 0.0022 * look * (settings.values.invert ? -1 : 1)); return; }
     game.yaw -= mx * 0.0026 * look;
     game.pitch = clamp(game.pitch + my * 0.0022 * look * (settings.values.invert ? -1 : 1), -0.45, 1.15);
     game.lookIdle = 0;
@@ -219,12 +220,14 @@ addEventListener('mousemove', (e) => {
 const touch = setupTouch(canvas, keys, pressed, (dx, dy) => {
   if (game.state !== 'play') return;
   const look = settings.values.look;
+  if (game.scope) { scopeLook(dx * 0.0062 * look, dy * 0.005 * look * (settings.values.invert ? -1 : 1)); return; }
   game.yaw -= dx * 0.0062 * look;
   game.pitch = clamp(game.pitch + dy * 0.005 * look * (settings.values.invert ? -1 : 1), -0.45, 1.15);
   game.lookIdle = 0;
 });
 addEventListener('wheel', (e) => {
   if (game.state === 'photo') photo.dist = clamp(photo.dist * (1 + Math.sign(e.deltaY) * 0.12), 1.2, 70);
+  else if (game.scope) game.scopeFov = clamp(game.scopeFov * (1 + Math.sign(e.deltaY) * 0.12), 4, 30);
   else game.dist = clamp(game.dist + Math.sign(e.deltaY) * 0.6, 4.5, 14);
 }, { passive: true });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -627,6 +630,17 @@ function updateCamera(dt, snap = false) {
     camera.position.lerp(tmp, rk);
     camera.lookAt(tmp2.copy(camTarget).lerp(v.camLook, rk));
   }
+  // looking through the telescope: the eye goes to the far end of it, and the view narrows onto what it is trained on
+  game.scopeK = clamp((game.scopeK || 0) + (game.scope ? dt / 1.6 : -dt / 1.0), 0, 1);
+  if (game.scopeK > 0) {
+    const e = game.scopeK * game.scopeK * (3 - 2 * game.scopeK);
+    camera.fov += (game.scopeFov - camera.fov) * e; camera.updateProjectionMatrix();
+    camera.position.lerp(tubes.scope.eye, e);
+    // (it starts on the serpent, and from there goes wherever it is turned)
+    const aim = tubes.scopeAim(tmp).sub(tubes.scope.eye), far = aim.length(), yaw = Math.atan2(aim.x, aim.z) + game.scopeYaw, pitch = clamp(Math.asin(aim.y / far) + game.scopePitch, -1.2, 1.3);
+    tmp.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).multiplyScalar(far).add(tubes.scope.eye);
+    camera.lookAt(tmp2.copy(camTarget).lerp(tmp, e));
+  }
 }
 
 const UP = new V3(0, 1, 0);
@@ -946,6 +960,25 @@ function reachNest() {
   hint('nest', 'Hold Space in the air to glide back down &nbsp;·&nbsp; or see where the wind goes.', 8500);
 }
 
+// ---------------------------------------------------------------- looking through the telescope
+/** Turn the telescope: slower, the closer it is looking. */
+function scopeLook(dx, dy) {
+  const k = camera.fov / 56;
+  game.scopeYaw = clamp(game.scopeYaw - dx * k, -2.6, 2.6);
+  game.scopePitch = clamp(game.scopePitch - dy * k, -1.4, 0.8);
+}
+function updateScope(dt, t) {
+  game.scopeT += dt;
+  const ax = (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('KeyA') ? 1 : 0), ay = (keys.has('ArrowDown') || keys.has('KeyS') ? 1 : 0) - (keys.has('ArrowUp') || keys.has('KeyW') ? 1 : 0);
+  if (ax || ay) scopeLook(ax * dt * 2.4, ay * dt * 2.4);
+  player.update(dt, t, IDLE, view.yaw, world);
+  for (const b of blots) b.update(dt, t, player);
+  if (game.scopeT > 1.6) hint('aim', 'Look about to turn the telescope &nbsp;·&nbsp; scroll to look closer &nbsp;·&nbsp; <kbd>E</kbd> to stop looking', 9000);
+  if (game.scopeT > 0.9 && ['KeyE', 'Space', 'Enter'].some((k) => pressed.has(k))) { game.scope = false; game.lookIdle = 0; }
+  hud.prompt(null);
+  updateCamera(dt);
+}
+
 // ---------------------------------------------------------------- resting at a vista
 const IDLE = { mx: 0, mz: 0, jump: false, jumpHeld: false, surf: false };
 function sitDown(v) {
@@ -1013,6 +1046,7 @@ function updateEnding(dt, t) {
 function updatePlay(dt, t) {
   game.playT += dt;
   if (game.rest) { updateRest(dt, t); return; }
+  if (game.scope) { updateScope(dt, t); return; }
   if (gallery.ending) { updateEnding(dt, t); return; }
   const input = {
     mx: (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0),
@@ -1191,6 +1225,11 @@ function updatePlay(dt, t) {
       if (pressed.has('KeyE')) { sitDown(v); return; }
     }
   }
+  // --- the telescope on the roof of the observatory: something to look through
+  if (!prompt && player.grounded && tubes.contains(player.pos) && player.pos.distanceTo(tubes.scope.at) < 2.8) {
+    prompt = '<kbd>E</kbd>Look through the telescope';
+    if (pressed.has('KeyE')) { game.scope = true; game.scopeT = 0; game.scopeYaw = 0; game.scopePitch = 0; game.scopeFov = 10; sound.play('sit'); hud.prompt(null); hud.clearHint(); return; }
+  }
   if (!game.hints.sketch && sketches.waiting(player.pos)) hint('sketch', 'Someone sketched this and never painted it. Swing your brush at it.', 7500);
   if (!game.hints.vista) for (const v of vistas.spots) if (v.pos.distanceTo(player.pos) < 13) hint('vista', 'An easel and a stool, looking out. A good place to rest.');
   hud.prompt(prompt, progress);
@@ -1347,9 +1386,13 @@ function tick(dt) {
   touch.show(game.state === 'play' && !game.menu && !gallery.ending);
   gallery.eye.copy(camera.position);
   gallery.indoors = game.state === 'play' && interior.inside(player.pos);
+  tubes.festive = !gallery.ended;
   for (const ev of tubes.update(dt, time, game.state === 'title' ? null : player)) {
     if (ev.type === 'fleck') fx.emit(tmp.set(ev.x, ev.y, ev.z), 0, 5, 0, Math.random() < 0.5 ? '#ffc070' : '#ffe6b0', 0.2, 2.2, 0, 1.4);
     else if (ev.type === 'arrived') saveSoon();
+    else if (ev.type === 'spark') fx.burst(tmp.set(ev.x, ev.y, ev.z), ev.n, { speed: ev.n > 1 ? 2.6 : 0.4, up: 0.6, colors: [ev.hex, ev.hex, '#ffffff'], size: 0.3, life: ev.n > 1 ? 1.7 : 1.3, gravity: 0.5 });
+    else if (ev.type === 'moth') { sound.play('wings'); sound.pluck(true); saveSoon(); }
+    else if (ev.type === 'firework') { const k = clamp(1 - ev.d / 240, 0, 1) ** 2; if (k > 0.01) { sound.whoosh(170, 55, 0.5, 0.22 * k, 0.8); sound.whoosh(2600, 5200, 0.7, 0.05 * k, 0.6); } }
     else if (ev.type === 'spring') { sound.play('jump'); sound.pluck(true); fx.burst(ev.at, 30, { speed: 6, up: 7, colors: [ev.hex, ev.hex, '#ffffff'], size: 0.4, life: 0.9, gravity: 9 }); }
   }
   gallery.outdoors = game.state === 'play' && !gallery.contains(player.pos) && !under.contains(player.pos) && !interior.inside(player.pos);

@@ -423,14 +423,29 @@ export class Gallery {
 
       // ---- the village: houses round the green, lights strung from a pole, and everybody out of doors
       const V = (S.village = { folk: [], bulbs: [], down: false });
+      const keep = [];                                        // [where, how far round it] the wheat is not to grow
       {
         const roof = ['#6a4cc0', '#7c5cd4', '#5a3ca8', '#8a6ce0'], wall = ['#f2e8ff', '#e2d4f6', '#fbf4ff', '#d4c4ec'], LAMP = ['#ffe6a8', '#fff4d0', '#ffd27a'], lit = new Bag();
+        const BEAM = ['#5a4480', '#4a3670', '#6a5494'], POLE = ['#f2d8a0', '#e8c078', '#fff0c8'], SHEAF = ['#f2d27a', '#e8c060', '#fff0b0'], FLAGS = ['#ff9ae0', '#8ae6ff', '#ffe2a0', '#c8a8ff', '#ff9a70'];
+        const one = (g, c) => add(g, [c, c], {});
+        const bulb = (q, size, op = 0.8) => { const b = glowSprite(world.glowTex, size, 0xffd890, op); b.position.copy(q); scene.add(b); V.bulbs.push(b); };
         const house = (ang, rad, k, tall = 0) => {
           const p = sp(ang, rad), yaw = Math.atan2(SUMMER.x - p.x, SUMMER.z - p.z), fx = Math.sin(yaw), fz = Math.cos(yaw), sx = Math.cos(yaw), sz = -Math.sin(yaw), H = (2.6 + tall) * k;
           add(place(new THREE.BoxGeometry(3.4 * k, H, 3.0 * k), p.x, p.y + H / 2, p.z, 0, yaw, 0), wall, { scale: 0.5 });
           add(place(new THREE.ConeGeometry(2.9 * k, 2.3 * k, 4), p.x, p.y + H + 1.1 * k, p.z, 0, yaw + Math.PI / 4, 0), roof, { scale: 0.5 });
           add(place(new THREE.BoxGeometry(0.5 * k, 1.3 * k, 0.5 * k), p.x + sx * 0.9 * k, p.y + H + 1.2 * k, p.z + sz * 0.9 * k, 0, yaw, 0), wall, { scale: 0.5 });
-          // its door and its windows, lit from inside
+          // timber at its corners and under its eaves, a step at the door, and a box of flowers under each window
+          for (const a of [-1, 1]) {
+            for (const b of [-1, 1]) add(place(new THREE.BoxGeometry(0.24 * k, H, 0.24 * k), p.x + sx * a * 1.7 * k + fx * b * 1.5 * k, p.y + H / 2, p.z + sz * a * 1.7 * k + fz * b * 1.5 * k, 0, yaw, 0), BEAM, { scale: 0.6 });
+            add(place(new THREE.BoxGeometry(3.6 * k, 0.24 * k, 0.2 * k), p.x + fx * a * 1.52 * k, p.y + H - 0.12 * k, p.z + fz * a * 1.52 * k, 0, yaw, 0), BEAM, { scale: 0.6 });
+            add(place(new THREE.BoxGeometry(0.78 * k, 0.18 * k, 0.28 * k), p.x + fx * 1.66 * k + sx * a * 1.1 * k, p.y + 1.26 * k, p.z + fz * 1.66 * k + sz * a * 1.1 * k, 0, yaw, 0), BEAM, { scale: 0.6 });
+            for (let j = -1; j <= 1; j++) one(place(new THREE.IcosahedronGeometry(0.14 * k, 0), p.x + fx * 1.68 * k + sx * (a * 1.1 + j * 0.24) * k, p.y + 1.42 * k, p.z + fz * 1.68 * k + sz * (a * 1.1 + j * 0.24) * k), FLAGS[(j + 3 + (a > 0 ? 1 : 0)) % FLAGS.length]);
+          }
+          add(place(new THREE.BoxGeometry(1.3 * k, 0.16, 0.7 * k), p.x + fx * 1.85 * k, p.y + 0.06, p.z + fz * 1.85 * k, 0, yaw, 0), STONE, { scale: 0.8 });
+          // a lamp by the door; and the door and the windows, lit from inside
+          const lampAt = new V3(p.x + fx * 1.66 * k + sx * 0.74 * k, p.y + 1.95 * k, p.z + fz * 1.66 * k + sz * 0.74 * k);
+          lit.add(daub(place(new THREE.OctahedronGeometry(0.17 * k), lampAt.x, lampAt.y, lampAt.z), LAMP, {}));
+          bulb(lampAt, 2.6, 0.7);
           const front = (dx, y, w, h) => lit.add(daub(place(new THREE.BoxGeometry(w * k, h * k, 0.12), p.x + fx * 1.53 * k + sx * dx * k, p.y + y * k, p.z + fz * 1.53 * k + sz * dx * k, 0, yaw, 0), LAMP, { scale: 2, spread: 1 }));
           front(0, 0.8, 0.85, 1.6); front(-1.1, 1.7, 0.6, 0.65); front(1.1, 1.7, 0.6, 0.65);
           if (tall) { front(0, 3.4, 0.7, 0.9); front(-1.1, 3.4, 0.5, 0.6); front(1.1, 3.4, 0.5, 0.6); }
@@ -451,8 +466,106 @@ export class Gallery {
             const b = glowSprite(world.glowTex, 1.7, [0xffe2a0, 0xff9ae0, 0x8ae6ff, 0xc8a8ff][(i + n) % 4], 0.95); b.position.copy(q);
             scene.add(b); V.bulbs.push(b);
           }
+          // (and little flags between the lights, hung in the line of the string)
+          const turn = Math.PI / 2 - Math.atan2(top.x - head.x, top.z - head.z);
+          for (let i = 0; i < 8; i++) { const q = head.clone().lerp(top, (i + 0.5) / 8); q.y -= Math.sin(((i + 0.5) / 8) * Math.PI) * 1.5 + 0.34; one(place(new THREE.ConeGeometry(0.3, 0.55, 3), q.x, q.y, q.z, Math.PI, turn, 0, 1, 1, 0.12), FLAGS[(i + n) % FLAGS.length]); }
         });
         const star = glowSprite(world.glowTex, 9, 0xfff0c0, 0.8); star.position.set(pole.x, pole.y + 8.5, pole.z); scene.add(star); V.bulbs.push(star);
+        // ---- what a village has standing about in it. (All of it is still there afterwards; only the lights are not.)
+        const at = (c, a, al, ac, h = 0) => new V3(c.x + Math.cos(a) * al - Math.sin(a) * ac, c.y + h, c.z + Math.sin(a) * al + Math.cos(a) * ac);
+        // paper lanterns on posts, either side of the way in
+        for (const [a, rad] of [[1.22, 14.6], [1.75, 14.5], [1.2, 9], [1.78, 9]]) {
+          const q = sp(a, rad);
+          add(place(new THREE.CylinderGeometry(0.06, 0.1, 1.9, 6), q.x, q.y + 0.95, q.z), BEAM, { scale: 0.6 });
+          add(place(new THREE.SphereGeometry(0.34, 8, 6), q.x, q.y + 2.15, q.z, 0, 0, 0, 1, 1.25, 1), LAMP, { scale: 2, spread: 1 });
+          for (const h of [1.72, 2.58]) add(place(new THREE.CylinderGeometry(0.2, 0.2, 0.07, 8), q.x, q.y + h, q.z), BEAM, { scale: 0.6 });
+          bulb(new V3(q.x, q.y + 2.15, q.z), 3.6);
+          world.colliders.push({ x: q.x, z: q.z, r: 0.3, late: true }); keep.push([q, 1.2]);
+        }
+        // two long tables laid for the feast, a bench either side of each
+        const table = (a, rad, n) => {
+          const c = sp(a, rad), P = (al, ac, h) => at(c, a, al, ac, h);
+          const box = (w, h, d, al, ac, y, pal, o) => { const q = P(al, ac, y); add(place(new THREE.BoxGeometry(w, h, d), q.x, q.y, q.z, 0, -a, 0), pal, o || { scale: 0.6 }); };
+          box(4.2, 0.12, 1.3, 0, 0, 0.95, WOOD);
+          box(4.3, 0.05, 0.5, 0, 0, 1.03, [FLAGS[n], FLAGS[n + 3]], { scale: 1.5, spread: 1 });
+          for (const al of [-1.9, 1.9]) for (const ac of [-0.5, 0.5]) box(0.14, 1.4, 0.14, al, ac, 0.25, WOOD);
+          for (const ac of [-1.15, 1.15]) { box(3.8, 0.1, 0.42, 0, ac, 0.52, WOOD); for (const al of [-1.5, 1.5]) box(0.12, 0.9, 0.36, al, ac, 0.05, WOOD); }
+          // what is on it: a pie, a jug, a loaf, a bowl of fruit; plates; and candles, lit
+          [-1.65, -0.85, 0, 0.85, 1.65].forEach((al, i) => {
+            const q = P(al, i % 2 ? 0.22 : -0.22, 1.06), kind = (i + n) % 4;
+            if (kind === 0) { one(place(new THREE.CylinderGeometry(0.3, 0.26, 0.12, 10), q.x, q.y + 0.06, q.z), '#e8b060'); one(place(new THREE.CylinderGeometry(0.24, 0.24, 0.05, 10), q.x, q.y + 0.13, q.z), '#c85a70'); }
+            else if (kind === 1) one(place(new THREE.CylinderGeometry(0.11, 0.17, 0.42, 8), q.x, q.y + 0.21, q.z), '#5a9cf0');
+            else if (kind === 2) one(place(new THREE.IcosahedronGeometry(0.2, 1), q.x, q.y + 0.1, q.z, 0, i, 0, 1.6, 0.75, 1), '#e0a860');
+            else { one(place(new THREE.CylinderGeometry(0.3, 0.16, 0.16, 10), q.x, q.y + 0.08, q.z), '#f4eede'); for (let j = 0; j < 3; j++) one(place(new THREE.IcosahedronGeometry(0.11, 0), q.x + Math.cos(j * 2.1) * 0.12, q.y + 0.2, q.z + Math.sin(j * 2.1) * 0.12), ['#e86a9a', '#f0c050', '#ff9a70'][j]); }
+          });
+          for (const al of [-1.25, -0.42, 0.42, 1.25]) for (const ac of [-0.45, 0.45]) { const q = P(al, ac, 1.03); one(place(new THREE.CylinderGeometry(0.17, 0.13, 0.04, 10), q.x, q.y, q.z), '#fff8ea'); }
+          for (const al of [-0.42, 0.42]) {
+            const q = P(al, 0, 1.06);
+            one(place(new THREE.CylinderGeometry(0.045, 0.045, 0.3, 6), q.x, q.y + 0.15, q.z), '#fff4d8');
+            lit.add(daub(place(new THREE.OctahedronGeometry(0.07), q.x, q.y + 0.4, q.z, 0, 0, 0, 1, 1.7, 1), LAMP, {}));
+            bulb(new V3(q.x, q.y + 0.42, q.z), 1.8, 0.7);
+          }
+          for (const al of [-1.4, 0, 1.4]) { const q = P(al, 0, 0); world.colliders.push({ x: q.x, z: q.z, r: 1.15, top: c.y + 1.15, late: true }); }
+          keep.push([c, 3.6]);
+        };
+        table(2.2, 6.5, 0); table(0.3, 8.2, 1);
+        // a well on the green, under a little roof
+        {
+          const q = sp(0.85, 6.5);
+          add(place(new THREE.CylinderGeometry(0.95, 1.02, 0.8, 14, 1, true), q.x, q.y + 0.4, q.z), STONE, { scale: 0.8 });
+          add(place(new THREE.TorusGeometry(0.97, 0.13, 5, 16), q.x, q.y + 0.8, q.z, Math.PI / 2, 0, 0), STONE, { scale: 0.8 });
+          one(place(new THREE.CircleGeometry(0.9, 14), q.x, q.y + 0.5, q.z, -Math.PI / 2, 0, 0), '#3f6ec8');
+          for (const k of [-1, 1]) add(place(new THREE.BoxGeometry(0.14, 2.3, 0.14), q.x + k * 0.98, q.y + 1.15, q.z), BEAM, { scale: 0.6 });
+          add(place(new THREE.CylinderGeometry(0.07, 0.07, 2.2, 6), q.x, q.y + 2.2, q.z, 0, 0, Math.PI / 2), BEAM, { scale: 0.6 });
+          add(place(new THREE.ConeGeometry(1.6, 0.9, 4), q.x, q.y + 2.85, q.z, 0, Math.PI / 4, 0), roof, { scale: 0.5 });
+          add(place(new THREE.CylinderGeometry(0.02, 0.02, 0.75, 4), q.x, q.y + 1.82, q.z), BEAM, {});
+          add(place(new THREE.CylinderGeometry(0.17, 0.13, 0.28, 8), q.x, q.y + 1.35, q.z), WOOD, { scale: 0.6 });
+          world.colliders.push({ x: q.x, z: q.z, r: 1.25, late: true }); keep.push([q, 2.4]);
+        }
+        // barrels and sacks by the mill, and a barrel at the end of a table
+        const barrel = (x, z) => {
+          const y = surfY(SUMMER, x, z);
+          add(place(new THREE.CylinderGeometry(0.4, 0.4, 0.9, 10), x, y + 0.45, z), WOOD, { scale: 0.6 });
+          for (const h of [0.22, 0.68]) add(place(new THREE.TorusGeometry(0.41, 0.04, 4, 12), x, y + h, z, Math.PI / 2, 0, 0), BEAM, {});
+          world.colliders.push({ x, z, r: 0.5, late: true }); keep.push([new V3(x, y, z), 1.1]);
+        };
+        barrel(hut.x - 0.7, hut.z + 2.3); barrel(hut.x + 0.3, hut.z + 2.5);
+        { const e = sp(2.32, 9.4); barrel(e.x, e.z); }
+        for (const [dx, dz] of [[1.4, 2.3], [1.9, 2.8]]) { const x = hut.x + dx, z = hut.z + dz; one(place(new THREE.IcosahedronGeometry(0.42, 1), x, surfY(SUMMER, x, z) + 0.3, z, 0, dx, 0, 1, 0.8, 0.85), '#e8d8b0'); keep.push([new V3(x, 0, z), 1]); }
+        // sheaves stood up in the wheat
+        for (const [a, rad] of [[2.25, 16], [4.2, 17], [5.2, 19]]) {
+          const q = sp(a, rad);
+          for (let j = 0; j < 4; j++) { const t = j * 1.57 + a; add(place(new THREE.ConeGeometry(0.34, 1.6, 6), q.x + Math.cos(t) * 0.26, q.y + 0.8, q.z + Math.sin(t) * 0.26, -Math.sin(t) * 0.22, 0, Math.cos(t) * 0.22), SHEAF, { scale: 1.2, spread: 1 }); }
+          add(place(new THREE.TorusGeometry(0.36, 0.05, 4, 10), q.x, q.y + 1.0, q.z, Math.PI / 2, 0, 0), BEAM, {});
+          world.colliders.push({ x: q.x, z: q.z, r: 0.6, late: true }); keep.push([q, 1.5]);
+        }
+        // a rail along the edge, either side of the way in
+        for (const [a0, a1] of [[1.72, 2.5], [0.62, 1.2]]) {
+          const n = Math.round(((a1 - a0) * 24) / 1.7); let was = null;
+          for (let i = 0; i <= n; i++) {
+            const a = a0 + ((a1 - a0) * i) / n, q = sp(a, rimR(SUMMER, a) - 1.3);
+            add(place(new THREE.BoxGeometry(0.15, 1.05, 0.15), q.x, q.y + 0.5, q.z, 0, -a, 0), POLE, { scale: 0.6 });
+            if (was) for (const h of [0.42, 0.82]) add(place(new THREE.BoxGeometry(was.distanceTo(q), 0.08, 0.08), (was.x + q.x) / 2, (was.y + q.y) / 2 + h, (was.z + q.z) / 2, 0, -Math.atan2(q.z - was.z, q.x - was.x), 0), POLE, { scale: 0.6 });
+            was = q;
+          }
+        }
+        // and the ways between: from where the painter comes in to the green, and from the green to every door
+        {
+          const cv = summer.tex.image, x = cv.getContext('2d'), span = summer.span, cu = (wx) => ((wx - SUMMER.x) / span + 0.5) * cv.width, cz = (wz) => ((wz - SUMMER.z) / span + 0.5) * cv.width, px = cv.width / span;
+          const lane = (pts) => {
+            const line = () => { x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(cu(p.x), cz(p.z)) : x.moveTo(cu(p.x), cz(p.z)))); x.stroke(); };
+            x.setLineDash([]); x.strokeStyle = 'rgba(226,208,252,0.42)'; x.lineWidth = 1.9 * px; line();
+            x.setLineDash([0.01, 1.15 * px]); x.strokeStyle = 'rgba(255,246,230,0.6)'; x.lineWidth = 0.62 * px; line();       // (stones, set along it)
+            for (let i = 1; i < pts.length; i++) { const n = Math.ceil(pts[i - 1].distanceTo(pts[i]) / 1.3); for (let j = 0; j <= n; j++) keep.push([pts[i - 1].clone().lerp(pts[i], j / n), 1.25]); }
+          };
+          x.lineCap = 'round'; x.lineJoin = 'round';
+          lane(new THREE.CatmullRomCurve3([sp(1.4, 24.5), sp(1.42, 17), sp(1.5, 10), sp(Math.PI / 2, 3.2)]).getPoints(16));
+          lane([new V3(SUMMER.x, 0, SUMMER.z + 18.4), sp(1.47, 13.5)]);
+          for (const h of V.houses) lane([sp(Math.atan2(h.door.z - SUMMER.z, h.door.x - SUMMER.x), 3.4), h.door]);
+          x.setLineDash([]); x.fillStyle = 'rgba(226,208,252,0.42)'; x.beginPath(); x.arc(cu(pole.x), cz(pole.z), 3.4 * px, 0, TAU); x.fill();
+          x.strokeStyle = 'rgba(255,246,230,0.6)'; x.lineWidth = 0.3 * px; x.beginPath(); x.arc(cu(pole.x), cz(pole.z), 3.4 * px, 0, TAU); x.stroke();
+          summer.tex.needsUpdate = true;
+        }
         V.windows = lit.mesh(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })); V.windows.frustumCulled = false;
         scene.add(V.windows);
         // the people of the village
@@ -481,7 +594,7 @@ export class Gallery {
       for (let i = 0; i < 620; i++) {
         const a = r() * TAU, d = 2 + Math.sqrt(r()) * 20.5, x = SUMMER.x + Math.cos(a) * d, z = SUMMER.z + Math.sin(a) * d, y = surfY(SUMMER, x, z);
         const near = (q, rad) => (q.x - x) ** 2 + (q.z - z) ** 2 < rad * rad;
-        if (near(springAt, 3) || near(pondAt, 5.6) || near(hut, 3.4) || near(sAt, 7) || near(npcAt, 8.5) || near(V.pole, 4) || V.houses.some((h) => near(h.p, 4.6) || near(h.door, 2.2)) || V.folk.some((q) => q.c && q.rad < 1 && near(q.c, 2.6)) || bed.some((q, k) => k % 2 === 0 && near(q, 1.5))) continue;
+        if (near(springAt, 3) || near(pondAt, 5.6) || near(hut, 3.4) || near(sAt, 7) || near(npcAt, 8.5) || near(V.pole, 4) || V.houses.some((h) => near(h.p, 4.6) || near(h.door, 2.2)) || V.folk.some((q) => q.c && q.rad < 1 && near(q.c, 2.6)) || keep.some(([q, rad]) => near(q, rad)) || bed.some((q, k) => k % 2 === 0 && near(q, 1.5))) continue;
         for (let k = 0; k < 3; k++) {
           const h = 1.0 + r() * 0.6;
           fields[z > SUMMER.z - 3 ? 0 : 1].add(daub(place(new THREE.ConeGeometry(0.075, h, 4, 1), x + (r() - 0.5) * 0.5, y + h / 2, z + (r() - 0.5) * 0.5, (r() - 0.5) * 0.3, r() * 3, (r() - 0.5) * 0.3), ['#ffffff', '#f4f0e4', '#e8e2d2'], { scale: 0.8, spread: 1 }));
