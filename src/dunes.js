@@ -61,7 +61,7 @@ function duneH(x, z) {
 // with everything else spread out below it (steepest at the very top and easing all the way down, like a slide, so that
 // no shoulder of it stands in the way of the view); the second is the one the chain comes down to; and far out, where nobody walks, they are mountains.
 // Off to one side the ground is levelled into a pan with a hollow in it and a hummock in the middle of the hollow: the
-// bed of the mirage, which is all that is really there.
+// bed of the mirage: that, and the palms on the hummock, are all that is really there.
 const DESERT = `
   float t1 = v * 0.0165 + 0.55 * sin(u * 0.0062 + 1.3) + 0.9, s1 = sin(t1 + 0.3 * sin(2.0 * t1));
   float t2 = (u * 0.8 + v * 0.6) * 0.045 + 0.8 * sin((u * 0.6 - v * 0.8) * 0.021), s2 = sin(t2);
@@ -477,10 +477,11 @@ export class Dunes {
     this.all = [this.sand, this.lowSand, this.tower, this.mesh, this.ring, this.drum];          // (not drawn while the painter is somewhere else)
 
     // a mirage: an oasis in a pan of sand off to the right of the way down. Water with the sky in it, palms on an islet
-    // in the middle, reeds along the shore. It is plain from the hill and from far off; it shivers and thins as it is
-    // come to, and where it was there is a dry hollow. (Noon makes it: by evening it is gone.)
+    // in the middle, reeds along the shore. The palms are really there, and the grass under them; the water is not. It is
+    // plain from the hill and from far off; it shivers and thins as it is come to, taking its reeds with it, and what is
+    // left is three palms on a hummock in a dry hollow. (Noon makes the water: by evening it is gone.)
     {
-      const rs = mulberry32(4421), C = lowAt(MIRAGE[0], MIRAGE[1]), bag2 = new Bag(), one = new V3(1, 1, 1);
+      const rs = mulberry32(4421), C = lowAt(MIRAGE[0], MIRAGE[1]), bag2 = new Bag(), ghost = new Bag(), one = new V3(1, 1, 1);          // (what is there, and what only seems to be)
       const LEAF = ['#3f8a4a', '#2f7440', '#56a052', '#6fb45a', '#256638'], RIB = ['#8aa054', '#6f8a44'], DRY = ['#b89a58', '#9a7e46', '#c8ac6a'];
       const BARK = ['#8d7355', '#7a6248', '#a08566', '#6b553e'], REED = ['#4a7a3e', '#3a6a36', '#6a9048', '#8aa24e'], HEART = ['#9aa860', '#b0a868'];
       const soup = (arr) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); return g; };
@@ -518,18 +519,19 @@ export class Dunes {
         for (let k = 0; k < 5; k++) bag2.add(daub(place(new THREE.IcosahedronGeometry(0.2 + tall * 0.016, 1), top.x + Math.cos(k * 1.3) * R(1) * 2, top.y - 0.55 - (k % 2) * 0.3, top.z + Math.sin(k * 1.3) * R(1) * 2), k % 2 ? BARK : HEART));
       };
       /** A clump of blades: grass, or reeds if they are tall. */
-      const tuft = (c, tall, n, pal) => {
+      const tuft = (c, tall, n, pal, into = bag2) => {
         const g = [];
         for (let i = 0; i < n; i++) {
           const a = rs() * TAU, r = rs() * 0.25 * tall + 0.1, lean = 0.2 + rs() * 0.5, h = tall * (0.55 + rs() * 0.55), w = 0.05 + tall * 0.035, bx = c.x + Math.cos(a) * r, bz = c.z + Math.sin(a) * r, wx = Math.cos(a + 1.57) * w, wz = Math.sin(a + 1.57) * w;
           g.push(bx - wx, c.y - 0.15, bz - wz, bx + wx, c.y - 0.15, bz + wz, bx + Math.cos(a) * h * lean, c.y + h, bz + Math.sin(a) * h * lean);
         }
-        bag2.add(daub(soup(g), pal, { scale: 0.5, spread: 1 }));
+        into.add(daub(soup(g), pal, { scale: 0.5, spread: 1 }));
       };
       const stone = (c, s) => bag2.add(daub(place(new THREE.IcosahedronGeometry(s, 0), c.x, c.y + s * 0.2, c.z, rs() * 3, rs() * 3, 0, 1.3, 0.6, 1), ROCK, { scale: 0.6, spread: 1 }));
       const here = (dx, dz, lift = 0) => lowAt(MIRAGE[0] + dx, MIRAGE[1] + dz, lift);
       // three palms on the islet, leaning apart; grass under them
       palmTree(here(-0.6, 0.4), 15, new V3(4.4, 0, 1.4)); palmTree(here(1.9, -1.3), 10.5, new V3(-3.6, 0, -1.8)); palmTree(here(-2.3, -1.9), 6.2, new V3(-1.0, 0, 2.6));
+      for (const [dx, dz] of [[-0.6, 0.4], [1.9, -1.3], [-2.3, -1.9]]) { const q = here(dx, dz); world.colliders.push({ x: q.x, z: q.z, r: 0.75, top: q.y + 5, late: true }); }
       for (let i = 0; i < 16; i++) { const a = rs() * TAU, r = 0.8 + rs() * 3.6; tuft(here(Math.cos(a) * r, Math.sin(a) * r), 0.7 + rs() * 0.8, 7, LEAF); }
       stone(here(3.0, 1.6), 0.9); stone(here(-3.2, 2.2), 0.6);
       // and along the shore, wherever the water meets the sand: reeds standing in it, grass above it, a stone here and there
@@ -537,7 +539,7 @@ export class Dunes {
         const a = (k / 13) * TAU + rs() * 0.3, cx = Math.cos(a), cz = Math.sin(a);
         let r = 9; while (r < 52 && desertH(C.x + cx * r, C.z + cz * r) < WATER) r += 0.5;
         if (r >= 52) continue;
-        if (k % 3 !== 2) for (let i = 0; i < 3; i++) { const q = here(cx * (r - 0.6 - i * 0.5) + (rs() - 0.5) * 2.4, cz * (r - 0.6 - i * 0.5) + (rs() - 0.5) * 2.4); q.y = Math.max(q.y, WATER - 0.5); tuft(q, 2.0 + rs() * 1.2, 9, REED); }
+        if (k % 3 !== 2) for (let i = 0; i < 3; i++) { const q = here(cx * (r - 0.6 - i * 0.5) + (rs() - 0.5) * 2.4, cz * (r - 0.6 - i * 0.5) + (rs() - 0.5) * 2.4); q.y = Math.max(q.y, WATER - 0.5); tuft(q, 2.0 + rs() * 1.2, 9, REED, ghost); }
         for (let i = 0; i < 3; i++) tuft(here(cx * (r + 1 + rs() * 2.5) + (rs() - 0.5) * 3, cz * (r + 1 + rs() * 2.5) + (rs() - 0.5) * 3), 0.6 + rs() * 0.6, 6, LEAF);
         if (k % 4 === 1) stone(here(cx * (r + 0.4), cz * (r + 0.4)), 0.5 + rs() * 0.6);
       }
@@ -552,7 +554,8 @@ export class Dunes {
         sh.fragmentShader = 'uniform float uTime, uFade;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>\n  diffuseColor.a *= ${band};`);
       };
       green.customProgramCacheKey = () => 'mirage';
-      const trees = bag2.mesh(green);
+      const reeds = ghost.mesh(green), trees = bag2.mesh(paintify(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), { scale: 1.1, amp: 0.45 }));
+      trees.frustumCulled = false; scene.add(trees); this.all.push(trees);          // (the palms stay: they are drawn with everything else that is here)
       // the water. How deep it is anywhere is worked out from the same ground the painter walks on, so its shore is
       // wherever the sand comes up through it. Pale and green in the shallows, darker out in the middle; the sky lies on
       // it, more of it the flatter it is looked across; and the palms stand in it upside down.
@@ -604,7 +607,7 @@ export class Dunes {
           }`,
       }));
       water.position.set(C.x, WATER, C.z);
-      this.mirageAt = C; this.mirage = new THREE.Group(); this.mirage.add(water, trees); this.mirage.visible = false;
+      this.mirageAt = C; this.mirage = new THREE.Group(); this.mirage.add(water, reeds); this.mirage.visible = false;
       this.mirage.traverse((m) => { m.frustumCulled = false; });
       scene.add(this.mirage);
     }
@@ -695,7 +698,7 @@ export class Dunes {
     if (!this.contains(p)) return null;
     const h = p.y - Y0, near = (q, r) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < r * r;
     if (this.below) {
-      if (near(this.mirageAt, 24)) return { key: 'mirage', line: 'There was water here, and a tree. From up there, there was.' };
+      if (near(this.mirageAt, 24)) return { key: 'mirage', line: 'The palms are real. The water was only ever there from up on the hill.' };
       if (near(this.foot, 34)) return { key: 'chain', line: 'This chain still holds. Its links are broad enough to walk up.' };
       if (near(this.isl, 230)) return { key: 'chains', line: 'Chains held it to the desert once. Most have parted: one still comes down to the sand, on the top of the great dune.' };
       if (p.z > Z0 + ENTER[1] - 30) return { key: 'adrift', line: 'There: a desert of its own, adrift over this one. And a long way down to it.' };
