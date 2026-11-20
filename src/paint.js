@@ -114,6 +114,7 @@ export class Painter {
     if (!isl || !isl.tex) return;
     const gh = w.groundHeight(s.x, s.z, s.y + 1.5);
     if (!(gh > -Infinity) || s.y - gh > 2.6) return;                       // too far above the ground to reach it
+    if (isl.surf && Math.abs(gh - isl.surf(s.x, s.z)) > 0.5) return;       // (standing over or under this island's ground, not on it: on the tower, or in the desert beneath)
     const cv = isl.tex.image, size = cv.width, px = size / isl.span, ctx = isl.ctx || (isl.ctx = cv.getContext('2d'));
     const u = ((s.x - isl.x) / isl.span + 0.5) * size, v = ((s.z - isl.z) / isl.span + 0.5) * size;
     const c = this._c.set(s.hex).offsetHSL(0, 0, s.shade), fill = '#' + c.getHexString();

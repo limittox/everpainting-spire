@@ -265,7 +265,7 @@ export class Gallery {
         const at = hp(Math.PI * 0.3, 15.5), back = arrive(at, centre(HALL), hall, flat(HALL)), f0 = lvl.frames[0];
         stand(lit(frame(W, H, picture(...lvl.picture), lvl.title), H), at, centre(HALL));
         for (const f of lvl.frames) stand(lit(frame(W, H, pic.hall, 'The Gallery'), H), f.at, f.face);
-        this.doors.push({ at, text: 'Step into ' + lvl.title, to: arrive(f0.at, f0.face, lvl.isl, (x, z) => world.groundHeight(x, z, 1e9)), toast: lvl.toast });
+        this.doors.push({ at, text: 'Step into ' + lvl.title, to: arrive(f0.at, f0.face, lvl.land,(x, z) => world.groundHeight(x, z, 1e9)), toast: lvl.toast });
         for (const f of lvl.frames) this.doors.push({ at: f.at, text: 'Step back into the Gallery', to: back, toast: ['The Gallery', ''], out: true });
         lvl.frameAt = at; this.dunes = lvl;
       };

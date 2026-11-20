@@ -552,6 +552,7 @@ function restore(d) {
 // ---------------------------------------------------------------- sizing
 function resize() {
   const w = innerWidth, h = innerHeight;
+  if (!w || !h) return;          // (a window with no size, hidden or not laid out yet: sizing to it would leave the camera with no shape at all, and nothing drawn from then on)
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
   renderer.setSize(w, h, false);
   const s = renderer.getDrawingBufferSize(new THREE.Vector2());
@@ -1272,7 +1273,7 @@ function updatePlay(dt, t) {
   } else if (world.bridges[3].progress < 1) { goal = world.bridges[3].anchor; objective = 'Lay the last bridge to the Spire'; }
   else { goal = world.gate; objective = 'Step up to the glowing gate'; }
   if (pale) { goal = null; objective = !under.done ? 'Bring the Dry Stair its water' : !seedbed.grown ? 'Grow the way on' : !seedbed.lit ? 'Cross to the Kiln on warm air' : !lastpage.cleared ? 'Ride the Kiln\u2019s warm air north' : !lastpage.done ? 'Fill the four wells' : 'It is morning'; }      // nothing in the first level to point at from here
-  if (hung) { goal = gallery.goal(player.pos); objective = gallery.grey || gallery.ended ? '' : gallery.slipped ? 'One of the dust sheets has come off' : hung === 'dunes' ? (dunes.done ? 'The picture is finished' : 'Climb the sunken tower') : hung === 'tubes' ? (tubes.done ? 'The picture is finished' : 'Mix what the picture is missing') : 'Two pictures are hung. Finish them both'; }
+  if (hung) { goal = gallery.goal(player.pos); objective = gallery.grey || gallery.ended ? '' : gallery.slipped ? 'One of the dust sheets has come off' : hung === 'dunes' ? (dunes.done ? 'The picture is finished' : dunes.below ? 'Reach the desert that is adrift' : 'Climb the sunken tower') : hung === 'tubes' ? (tubes.done ? 'The picture is finished' : 'Mix what the picture is missing') : 'Two pictures are hung. Finish them both'; }
   hud.objective(objective);
   game.guideT -= dt;
   if (goal && game.guideT <= 0 && !player.ride && !player.lift) {
@@ -1422,7 +1423,10 @@ function tick(dt) {
     else if (ev.type === 'firework') { const k = clamp(1 - ev.d / 240, 0, 1) ** 2; if (k > 0.01) { sound.whoosh(170, 55, 0.5, 0.22 * k, 0.8); sound.whoosh(2600, 5200, 0.7, 0.05 * k, 0.6); } }
     else if (ev.type === 'spring') { sound.play('jump'); sound.pluck(true); fx.burst(ev.at, 30, { speed: 6, up: 7, colors: [ev.hex, ev.hex, '#ffffff'], size: 0.4, life: 0.9, gravity: 9 }); }
   }
-  for (const ev of dunes.update(dt, time, game.state === 'title' ? null : player, camera)) {
+  // (the desert is only drawn while the painter is in it, so it is told where they are on the title screen too: a
+  // game left there would otherwise open on an empty sky. Nothing that happens there is acted on until the game begins.)
+  for (const ev of dunes.update(dt, time, player, camera)) {
+    if (game.state === 'title') continue;
     if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
     else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
     else if (ev.type === 'back') sound.play('wind');
@@ -1556,7 +1560,9 @@ function draw() {
   if (!shown) { shown = true; document.getElementById('fade').classList.add('clear'); }
 }
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  // (never less than nothing: a browser may hand the first frame a time from before the page finished loading, and a
+  // step backwards ran the telescope's and the look-out's cameras with nothing to aim at, which left no picture at all)
+  const dt = clamp((now - last) / 1000, 0, 0.05); last = now;
   if (!window.__game.paused) tick(dt);          // (debug: __game.paused holds the world still; __game.step() still advances it)
   draw();
   requestAnimationFrame(frame);

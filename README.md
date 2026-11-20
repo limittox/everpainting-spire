@@ -71,6 +71,7 @@ There the picture stops explaining itself: the hour is yours to set, some things
 
 **The Sunken Tower** is a desert, and a whole day. It begins under a high white sun; the hour goes with you, so that it is gold by the time the tower is reached, the sun is going down as you climb it, and at the top it is night, with every star out.
 
+- **The way in is across open desert**: you step in among dunes as high as hills, come over the first of them, and see the desert you are after adrift a long way off, with the tower on it. Four chains of stone held it down once; three have parted. The fourth still comes down to the top of a great dune, and its links are broad enough to walk up. Fall from the island and the paint carries you back to the head of the chain.
 - **The sand keeps the mark of whatever crosses it**: a furrow behind you, a wider one when you skate, a hollow where you land, a scoop where the brush strikes. The wind fills them in again, slowly.
 - **Statues are sunk in it**: an avenue of seated figures, each pair deeper than the last, a great head thrown back, an open hand big enough to stand in.
 - **The tower** leans, and is buried to half its height. The way up is round the outside: a stair with a gap in it, beams, platforms hung on ropes, a drum that throws you up, and at the last the evening wind, which lifts a gliding painter to the roof. If you fall from above one of its three galleries, the paint carries you back to that gallery; gliding down is left alone.

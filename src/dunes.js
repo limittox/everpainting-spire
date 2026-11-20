@@ -8,6 +8,9 @@ import { DUNE_SUN } from './day.js';
 // The Sunken Tower: another picture in the gallery. A desert adrift in the sky, sand going over its edges; statues
 // that the sand has had for a long time; and a great tower, leaning, sunk in it to half its height.
 //
+//   the way in ..... is across another desert, far under this one: the painter steps in among dunes as high as hills,
+//                    comes over the first of them to see the island adrift a long way off, and gets up onto it by
+//                    the one chain, of the four that held it, which still reaches the sand.
 //   the sand ....... keeps the mark of whatever crosses it: a furrow behind the painter, a wider one behind a
 //                    skating painter, a hollow where they land, a scoop where the brush strikes. The wind fills
 //                    them in again, slowly.
@@ -18,9 +21,14 @@ import { DUNE_SUN } from './day.js';
 //                    balcony: the paint carries the painter back to it.
 //   the beam ....... at the very top looks out over everything, and the picture is finished by looking.
 
-const V3 = THREE.Vector3, TAU = Math.PI * 2, deg = (d) => (d * Math.PI) / 180;
+const V3 = THREE.Vector3, TAU = Math.PI * 2, deg = (d) => (d * Math.PI) / 180, UP = new V3(0, 1, 0);
 const X0 = 12000, Y0 = 0, Z0 = 1000, R0 = 78, HALF = 92;        // (the sand that takes a mark is a square HALF each way)
-const START = new V3(X0, 0, Z0 + 62);                           // where the frame lets the painter in
+// the open desert far under the island: how low it lies, where its ground is centred, how far that reaches and how
+// far it may be walked; where the frame stands in it (east and south of the island's middle); and the one chain that
+// still holds, from the island's rim down to the top of a great dune
+const LOW = Y0 - 130, LAND = { x: X0, z: Z0 + 250, r: 420, keep: 345 }, ENTER = [0, 560];
+const CH = deg(64), HEAD_R = rimR({ r: R0, ph: 0.9 }, CH) - 3, FOOT = [Math.cos(CH) * (HEAD_R + 130), Math.sin(CH) * (HEAD_R + 130)];
+const START = new V3(X0 + Math.cos(CH) * HEAD_R, 0, Z0 + Math.sin(CH) * HEAD_R);       // where the chain lets the painter onto the island
 // the tower: where it stands, how far it leans for every unit it rises, and how wide it is at a height
 const TX = X0 + 4, TZ = Z0 - 22, LX = 0.13, LZ = -0.03, TOP = 72.3;
 const ax = (h) => TX + LX * h, az = (h) => TZ + LZ * h, wall = (h) => 10.5 - 0.035 * h;
@@ -43,6 +51,31 @@ function duneH(x, z) {
   const calm = smooth((R0 - Math.hypot(dx, dz)) / 16) * (0.3 + 0.7 * smooth((dt - 16) / 26)) * (0.25 + 0.75 * smooth((Math.hypot(x - START.x, z - START.z) - 5) / 14));
   const dune = 3.6 * ridge(dx * 0.05 + 0.9 * Math.sin(dz * 0.033) + 0.4) ** 1.4 + 1.6 * ridge(dz * 0.085 + 0.7 * Math.sin(dx * 0.05) + 1.1) ** 1.2 + 0.5 * Math.sin(dx * 0.19 + dz * 0.13);
   return Y0 + 1.3 + calm * dune + 13.2 * smooth(1 - dt / 34) * (0.4 + 0.6 * (0.5 + (0.5 * tz) / Math.max(dt, 0.01)));
+}
+
+// The open desert: dunes as high as hills. The same arithmetic is read by the game (how high is the ground?) and by
+// the shader that draws the sand, so it is written once, in the shader's language, and the game's copy is made from
+// it. (u is east and v is south of the island's middle.) The first great dune stands between the frame and everything
+// else; the second is the one the chain comes down to; and far out, where nobody walks, they are mountains.
+const DESERT = `
+  float t1 = v * 0.0165 + 0.55 * sin(u * 0.0062 + 1.3) + 0.9, s1 = sin(t1 + 0.3 * sin(2.0 * t1));
+  float t2 = (u * 0.8 + v * 0.6) * 0.045 + 0.8 * sin((u * 0.6 - v * 0.8) * 0.021), s2 = sin(t2);
+  float t3 = (u * 0.35 - v * 0.94) * 0.0052 + 0.7 * sin(u * 0.0031 + v * 0.0023) + 2.0, s3 = sin(t3);
+  float calm = smoothstep(6.0, 30.0, sqrt(u * u + (v - ${ENTER[1].toFixed(1)}) * (v - ${ENTER[1].toFixed(1)}))), rim = smoothstep(430.0, 1000.0, sqrt(u * u + (v - 250.0) * (v - 250.0)));
+  float e1 = (v - 500.0 - 26.0 * sin(u * 0.009)) / 40.0, e2 = ((u - ${FOOT[0].toFixed(2)}) * (u - ${FOOT[0].toFixed(2)}) + (v - ${FOOT[1].toFixed(2)}) * (v - ${FOOT[1].toFixed(2)})) / 3600.0;
+  return ${LOW.toFixed(1)} + 34.0 * (1.0 - sqrt(s1 * s1 + 0.004)) * (0.6 + 0.4 * sin(u * 0.004 + v * 0.003 + 2.0)) + 4.5 * calm * (1.0 - sqrt(s2 * s2 + 0.01))
+    + 38.0 * exp(-e1 * e1) + 62.0 * exp(-e2) + 70.0 * rim * (1.0 - sqrt(s3 * s3 + 0.004));
+`;
+const desert0 = new Function('u', 'v', 'const { sin, exp, sqrt } = Math, smoothstep = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); };' + DESERT.replace(/float /g, 'let '));
+const desertH = (x, z) => desert0(x - X0, z - Z0);
+
+const GREY = 'rgb(128,128,128)';
+/** A canvas that keeps what has been pressed into the sand (grey is untouched, darker is dug, lighter is heaped), over a square `size` wide whose corner is at (x0, z0). */
+function marks(x0, z0, size) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 1024;
+  const c = cv.getContext('2d'); c.fillStyle = GREY; c.fillRect(0, 0, 1024, 1024);
+  const tex = new THREE.CanvasTexture(cv); tex.flipY = false; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;
+  return { c, tex, x0, z0, size, dirty: false };
 }
 
 export class Dunes {
@@ -73,14 +106,12 @@ export class Dunes {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx, 1));
       g.computeVertexNormals();
-      const cv = document.createElement('canvas'); cv.width = cv.height = 1024;
-      this.tctx = cv.getContext('2d'); this.tctx.fillStyle = 'rgb(128,128,128)'; this.tctx.fillRect(0, 0, 1024, 1024);
-      this.trail = new THREE.CanvasTexture(cv); this.trail.flipY = false; this.trail.generateMipmaps = false; this.trail.minFilter = THREE.LinearFilter;
-      this.tdirty = false; this.tfill = 0; this.stepAt = new V3(1e9, 0, 0);
+      this.top = marks(X0 - HALF, Z0 - HALF, 2 * HALF); this.low = marks(0, 0, 160);          // (the one for the open desert goes with the painter)
+      this.tfill = 0; this.stepAt = new V3(1e9, 0, 0);
       const mat = paintify(new THREE.MeshLambertMaterial({ map: isl.tex }), { scale: 1, amp: 0.3 }), painted = mat.onBeforeCompile;
       mat.onBeforeCompile = (sh, r) => {
         painted.call(mat, sh, r);
-        sh.uniforms.tTrail = { value: this.trail };
+        sh.uniforms.tTrail = { value: this.top.tex };
         sh.uniforms.uSand = { value: new THREE.Vector4(X0 - HALF, Z0 - HALF, 2 * HALF, R0) };
         sh.vertexShader = 'uniform sampler2D tTrail; uniform vec4 uSand; varying vec2 vTrail;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vTrail = (position.xz - uSand.xy) / uSand.z;\n  transformed.y += (texture2D(tTrail, vTrail).r - 0.5) * 1.3;');
         sh.fragmentShader = 'uniform sampler2D tTrail; uniform vec4 uSand; varying vec2 vTrail;\n' + sh.fragmentShader
@@ -98,6 +129,38 @@ export class Dunes {
       scene.add(this.sand);
     }
     const sandAt = (dx, dz, lift = 0) => new V3(X0 + dx, duneH(X0 + dx, Z0 + dz) + lift, Z0 + dz);
+    const lowAt = (dx, dz, lift = 0) => new V3(X0 + dx, desertH(X0 + dx, Z0 + dz) + lift, Z0 + dz);
+
+    // ---- the open desert, far under all this: ground of its own, as far as it can be walked
+    this.land = { name: 'The Sunken Tower', x: LAND.x, y: LOW - 5, z: LAND.z, r: LAND.r, ph: 0.4, pale: true, quiet: true, bare: true, surf: desertH, index: world.islands.length };
+    world.islands.push(this.land);
+    {
+      // its sand is one net that goes with the painter: fine about their feet, where it is pressed down like the sand
+      // above, and coarser the farther off it is, out to the end of sight. The island's shadow lies on it.
+      this.uEye = { value: new THREE.Vector2() }; this.uLow = { value: new THREE.Vector3() }; this.uShade = { value: new THREE.Vector3() };
+      const mat = paintify(new THREE.MeshLambertMaterial({ color: 0xe8c486 }), { scale: 1, amp: 0.3 }), painted = mat.onBeforeCompile;
+      const glsl = `uniform vec2 uEye; uniform sampler2D tTrail; uniform vec3 uTrail; uniform vec3 uShade; varying vec2 vSand;
+        float desertH(float u, float v) {${DESERT}}
+        float pressed(vec2 w) { vec2 q = (w - uTrail.xy) / uTrail.z; return q.x > 0.0 && q.y > 0.0 && q.x < 1.0 && q.y < 1.0 ? texture2D(tTrail, q).r - 0.5 : 0.0; }\n`;
+      mat.onBeforeCompile = (sh, r) => {
+        painted.call(mat, sh, r);
+        Object.assign(sh.uniforms, { uEye: this.uEye, uTrail: this.uLow, uShade: this.uShade, tTrail: { value: this.low.tex } });
+        sh.vertexShader = glsl + sh.vertexShader.replace('#include <begin_vertex>', `vec2 gq = position.xy * (64.0 + 1336.0 * position.xy * position.xy * position.xy * position.xy);
+          vSand = uEye + vec2(gq.x, -gq.y);
+          vec3 transformed = vec3(vSand.x, desertH(vSand.x, vSand.y) + pressed(vSand) * 1.3, vSand.y);`);
+        sh.fragmentShader = glsl + sh.fragmentShader
+          .replace('#include <map_fragment>', `#include <map_fragment>\n  float sandH = desertH(vSand.x, vSand.y);
+            diffuseColor.rgb *= (1.0 + pressed(vSand) * 1.5) * (1.0 - uShade.z * (1.0 - smoothstep(52.0, 86.0, length(vSand - uShade.xy)))) * mix(vec3(0.84, 0.77, 0.7), vec3(1.05, 1.04, 1.0), smoothstep(${LOW.toFixed(1)}, ${(LOW + 44).toFixed(1)}, sandH));          // (deeper in the hollows, paler on the crests)`)
+          // (lit by how the dune slopes, which is worked out here and not at the corners of the net: so a far dune is as crisp as a near one)
+          .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n  { float e = 0.16, h0 = sandH;
+            float hx = pressed(vSand + vec2(e, 0.0)) - pressed(vSand - vec2(e, 0.0)), hz = pressed(vSand + vec2(0.0, e)) - pressed(vSand - vec2(0.0, e));
+            float rp = cos(dot(vSand, vec2(0.92, 0.39)) * 3.4 + sin(dot(vSand, vec2(-0.39, 0.92)) * 0.5) * 2.2) * 0.07 * (1.0 - smoothstep(30.0, 110.0, length(vSand - uEye)));
+            normal = normalize(mat3(viewMatrix) * (normalize(vec3(h0 - desertH(vSand.x + 0.5, vSand.y), 0.5, h0 - desertH(vSand.x, vSand.y + 0.5))) + vec3(-hx * 12.0 + rp * 0.92, 0.0, -hz * 12.0 + rp * 0.39))); }`);
+      };
+      mat.customProgramCacheKey = () => 'lowsand';
+      this.lowSand = new THREE.Mesh(new THREE.PlaneGeometry(2, 2, 256, 256), mat); this.lowSand.position.set(X0, 0, Z0); this.lowSand.frustumCulled = false;
+      scene.add(this.lowSand);
+    }
 
     // ---- what can be stood on that is not sand, and is asked for by the ground: [is this point on it, and how high]
     const decks = (this.decks = []);
@@ -178,6 +241,31 @@ export class Dunes {
       world.colliders.push({ x: p.x, z: p.z, r: 1.2, top: p.y + h + 1.6, late: true });
     }
     for (const [dx, dz, turn] of [[11, 44, 0.4], [-12, 26, 1.9], [15, 16, 1.1], [-21, 44, 0.2], [24, 6, 2.6]]) { const p = sandAt(dx, dz, 0.35); add(place(new THREE.CylinderGeometry(1.0, 1.0, 2.2, 10), p.x, p.y, p.z, 0, turn, Math.PI / 2 - 0.12)); }
+
+    // ================================================================================== the chains
+    // Four chains of stone held the island to the desert under it. Three have parted: what is left of them hangs from
+    // the rim, and the rest lies in the sand by the posts it was made fast to. The fourth still goes down to the top
+    // of a great dune, and its links are broad enough to walk up.
+    const chain = (a, b) => {
+      const n = Math.max(1, Math.round(a.distanceTo(b) / 7));
+      for (let i = 0; i < n; i++) {
+        M.lookAt(a, b, UP).setPosition(a.clone().lerp(b, (i + 0.5) / n));          // (its own z down the chain, its own y out of the top of it)
+        const link = (g, pal) => add(g.applyMatrix4(M), pal);
+        link(box(5, 0.9, 6.5, 0, -0.45, 0)); for (const k of [-1, 1]) link(box(0.55, 0.6, 6.5, k * 2.5, -0.05, 0));
+        if (i % 3 === 1) link(box(2.4, 0.1, 3.4, 0, 0.01, 0), TILE);
+        if (i < n - 1) for (const k of [-1, 1]) link(place(new THREE.TorusGeometry(1.7, 0.42, 5, 12), k * 1.5, -2.0, -3.5, 0, Math.PI / 2, 0), ROCK);
+      }
+    };
+    const posts = (p, th) => { for (const k of [-1, 1]) { const x = p.x - Math.sin(th) * k * 4.6, z = p.z + Math.cos(th) * k * 4.6; add(box(2.2, 13, 2.2, x, p.y + 3.5, z, 0.05 * k, -th, 0.06)); add(box(2.8, 0.7, 2.8, x, p.y + 10.2, z, 0.05 * k, -th, 0.06), GILT); world.colliders.push({ x, z, r: 1.4, top: p.y + 10.5, late: true }); } };
+    /** A slope to stand on, from a up to b, `hw` to either side. */
+    const ramp = (a, b, hw) => { const ex = b.x - a.x, ez = b.z - a.z, L = Math.hypot(ex, ez); decks.push((x, z) => { const s = ((x - a.x) * ex + (z - a.z) * ez) / L; return s > -0.5 && s < L + 0.5 && Math.abs((z - a.z) * ex - (x - a.x) * ez) / L < hw ? a.y + ((b.y - a.y) * clamp(s, 0, L)) / L : null; }); };
+    this.foot = lowAt(FOOT[0], FOOT[1], 0.3); this.head = new V3(START.x, duneH(START.x, START.z) + 0.2, START.z);
+    chain(this.foot, this.head); ramp(this.foot, this.head, 2.3); posts(this.foot, CH);
+    for (const [th, len] of [[deg(170), 46], [deg(262), 30], [deg(338), 58]]) {
+      const r = rimR(isl, th), o = new V3(Math.cos(th), 0, Math.sin(th)), a = new V3(X0, Y0 - 3, Z0).addScaledVector(o, r - 1.5);
+      chain(a.clone().addScaledVector(o, 3).setY(a.y - len), a);
+      const far = lowAt(o.x * (r + 108), o.z * (r + 108), -0.6); chain(far, lowAt(o.x * (r + 82), o.z * (r + 82), -0.1)); posts(far, th);
+    }
 
     // ================================================================================== the tower
     // (built standing straight, and then leaned: every floor of it stays level, which is what lets it be climbed)
@@ -338,8 +426,8 @@ export class Dunes {
       scene.add(this.ring);
       T(place(new THREE.CylinderGeometry(0.4, 0.9, 2.0, 8), -3.4, TOP + 1.0, -1.5)); fire(world0(-3.4, TOP + 7.4, -1.5), 9, 0xfff0c0, 0.7);
       this.perches.push({ p: world0(1.5, TOP, -1.8), h: TOP });
-      // the two frames that lead back to the gallery: one where the painter comes in, one on the roof
-      this.frames = [{ at: sandAt(0, 62), face: new V3(X0, 0, Z0) }, { at: world0(-0.5, TOP, 3.6), face: world0(1.5, TOP, -1) }];
+      // the two frames that lead back to the gallery: one where the painter comes in, out in the open desert, and one on the roof
+      this.frames = [{ at: lowAt(ENTER[0], ENTER[1]), face: new V3(X0, 0, Z0) },{ at: world0(-0.5, TOP, 3.6), face: world0(1.5, TOP, -1) }];
     }
     // (the lean, last of all)
     const lean = new THREE.Matrix4().set(1, LX, 0, TX, 0, 1, 0, Y0, 0, LZ, 1, TZ, 0, 0, 0, 1);
@@ -363,22 +451,21 @@ export class Dunes {
 
     // ================================================================================== things only to be looked at
     // sand going over the edge of the desert, in five places
-    for (const th of [0.5, 1.9, 3.0, 4.2, 5.5]) { const r = rimR(isl, th) - 0.5, lip = new V3(X0 + Math.cos(th) * r, 0, Z0 + Math.sin(th) * r); lip.y = duneH(lip.x, lip.z) + 0.1; pour(lip, th, 5 + (th * 3) % 4, 64); }
-    // far below, more sand, to the end of sight; rocks standing out of it, and two more of the great heads
+    for (const th of [0.5, 1.9, 3.0, 4.2, 5.5]) { const r = rimR(isl, th) - 0.5, lip = new V3(X0 + Math.cos(th) * r, 0, Z0 + Math.sin(th) * r); lip.y = duneH(lip.x, lip.z) + 0.1; pour(lip, th, 5 + (th * 3) % 4, lip.y - desertH(lip.x, lip.z) + 1); }
+    // out in the open desert: rocks standing up out of it, two more of the great heads, and one of the seated ones, in to its chest
     {
-      const g = new THREE.PlaneGeometry(3200, 3200, 64, 64); g.rotateX(-Math.PI / 2);
-      const p = g.attributes.position;
-      for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setXYZ(i, X0 + x, Y0 - 78 + 16 * ridge(x * 0.006 + Math.sin(z * 0.004) * 1.3) ** 1.3 + 9 * ridge(z * 0.011 + Math.sin(x * 0.007)), Z0 + z); }
-      add(g.toNonIndexed(), ['#d9b676', '#cfa868', '#e0c088', '#c69c5e'], { scale: 0.004, spread: 1 });          // (darker than the sand up here, so that the desert stands out from it)
-      for (const [dx, dz, r, h] of [[-260, -180, 26, 120], [-190, -330, 18, 90], [310, -120, 30, 150], [220, 260, 22, 100], [-330, 140, 28, 130], [60, -420, 34, 170], [420, 90, 20, 110], [-80, 380, 24, 95]]) {
-        add(place(new THREE.CylinderGeometry(r * 0.72, r, h, 9, 3), X0 + dx, Y0 - 78 + h / 2, Z0 + dz, 0, dx, 0.03), ROCK, { scale: 0.02, spread: 0.8 });
-        add(place(new THREE.CylinderGeometry(r * 0.86, r * 0.8, h * 0.07, 9), X0 + dx, Y0 - 78 + h, Z0 + dz, 0, dx, 0.03), ROCK, { scale: 0.02, spread: 0.8 });
+      for (const [dx, dz, r, h] of [[-260, -180, 26, 120], [-190, -330, 18, 90], [310, -120, 30, 150], [220, 260, 22, 100], [-330, 140, 28, 130], [60, -420, 34, 170], [420, 90, 20, 110], [-150, 410, 24, 95]]) {
+        const y = desertH(X0 + dx, Z0 + dz) - 6;
+        add(place(new THREE.CylinderGeometry(r * 0.72, r, h, 9, 3), X0 + dx, y + h / 2, Z0 + dz, 0, dx, 0.03), ROCK, { scale: 0.02, spread: 0.8 });
+        add(place(new THREE.CylinderGeometry(r * 0.86, r * 0.8, h * 0.07, 9), X0 + dx, y + h, Z0 + dz, 0, dx, 0.03), ROCK, { scale: 0.02, spread: 0.8 });
+        world.colliders.push({ x: X0 + dx, z: Z0 + dz, r: r * 0.95, top: y + h, late: true });
       }
-      set(head(), new V3(X0 - 150, Y0 - 52, Z0 - 250), 30, 0.7, -0.35, 0.2); set(head(), new V3(X0 + 240, Y0 - 58, Z0 + 60), 26, -1.9, -0.6, -0.15);
+      for (const [p, s, yaw, tx, tz] of [[lowAt(-150, -250, 14), 30, 0.7, -0.35, 0.2], [lowAt(240, 60, 12), 26, -1.9, -0.6, -0.15]]) { set(head(), p, s, yaw, tx, tz); world.colliders.push({ x: p.x, z: p.z, r: s * 0.85, top: p.y + s, late: true }); }
+      { const p = lowAt(-52, 350, -31); set(guardian(), p, 3.2, 0.5, 0.05, -0.08); world.colliders.push({ x: p.x, z: p.z, r: 10, top: p.y + 60, late: true }); }
     }
     this.mesh = bag.mesh(stoneMat()); this.mesh.material.side = THREE.DoubleSide; this.mesh.frustumCulled = false;
     scene.add(this.mesh);
-    this.all = [this.sand, this.tower, this.mesh, this.ring, this.drum];          // (not drawn while the painter is somewhere else)
+    this.all = [this.sand, this.lowSand, this.tower, this.mesh, this.ring, this.drum];          // (not drawn while the painter is somewhere else)
 
     // the sky of this picture: a sun that can be seen going down, and then every star there is
     this.sky = new THREE.Group(); this.sky.visible = false;
@@ -432,6 +519,7 @@ export class Dunes {
     this.done = false;                // has the picture been looked out over?
     this.was = false; this.wasGround = true; this.fall = 0;
     this.from = 0; this.high = 0; this.glid = false; this.armed = true;       // the gallery last stood on; the highest yet; did the painter glide down?
+    this.below = true; this.up = false;                                        // is the painter down in the open desert? have they stood on the island since?
     this.events = []; this._v = new V3();
   }
 
@@ -440,26 +528,36 @@ export class Dunes {
   /** How fast the air is rising here: only in the evening wind, at the end of the third gallery. */
   thermal(p) { const h = p.y - this.wind.y; return h > -0.6 && h < 26 && (p.x - this.wind.x) ** 2 + (p.z - this.wind.z) ** 2 < 3.8 * 3.8 ? 12 * clamp((25 - h) / 5, 0, 1) : 0; }
   /** Where to go next, for the flecks that drift toward it. */
-  goal() { return this.done ? null : this.from >= 4 ? this.perch : this.perches[this.from + 1].p; }
+  goal() { return this.done ? null : this.below ? this.foot : this.from >= 4 ? this.perch : this.perches[this.from + 1].p; }
 
   /** Press the sand down round a point: `r` wide, and how deep (0..1). A little of it is heaped round the edge. */
-  dig(x, z, r, depth) {
-    const c = this.tctx, S = 1024 / (2 * HALF), u = (x - X0 + HALF) * S, v = (z - Z0 + HALF) * S, R = r * S;
+  dig(x, z, r, depth, tr = this.top) {
+    const c = tr.c, S = 1024 / tr.size, u = (x - tr.x0) * S, v = (z - tr.z0) * S, R = r * S;
     let g = c.createRadialGradient(u, v, R * 0.5, u, v, R * 1.9);
     g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.45, `rgba(255,255,255,${depth * 0.45})`); g.addColorStop(1, 'rgba(255,255,255,0)');
     c.fillStyle = g; c.fillRect(u - R * 2, v - R * 2, R * 4, R * 4);
     g = c.createRadialGradient(u, v, 0, u, v, R);
     g.addColorStop(0, `rgba(0,0,0,${depth})`); g.addColorStop(0.6, `rgba(0,0,0,${depth * 0.7})`); g.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = g; c.fillRect(u - R, v - R, R * 2, R * 2);
-    this.tdirty = true;
+    tr.dirty = true;
   }
-  /** The brush, striking the ground at (x, z): it leaves a scoop. */
-  strike(x, z, p) { if (this.contains(p) && Math.abs(duneH(x, z) - p.y) < 1.5) { this.dig(x, z, 1.25, 0.6); this.events.push({ type: 'dust', x, y: duneH(x, z), z, n: 10 }); } }
+  /** The brush, striking the ground at (x, z): it leaves a scoop, in whichever sand is underfoot. */
+  strike(x, z, p) {
+    if (!this.contains(p)) return;
+    const tr = Math.abs(duneH(x, z) - p.y) < 1.5 ? this.top : Math.abs(desertH(x, z) - p.y) < 1.5 ? this.low : null;
+    if (tr) { this.dig(x, z, 1.25, 0.6, tr); this.events.push({ type: 'dust', x, y: p.y, z, n: 10 }); }
+  }
 
   /** Something here that is worth a word. */
   waiting(p) {
     if (!this.contains(p)) return null;
     const h = p.y - Y0, near = (q, r) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < r * r;
+    if (this.below) {
+      if (near(this.foot, 34)) return { key: 'chain', line: 'This chain still holds. Its links are broad enough to walk up.' };
+      if (near(this.isl, 230)) return { key: 'chains', line: 'Chains held it to the desert once. Most have parted: one still comes down to the sand, on the top of the great dune.' };
+      if (p.z < Z0 + 465) return { key: 'adrift', line: 'There: a desert of its own, adrift over this one.' };
+      return { key: 'vast', line: 'It is a long way, over the dunes. They are quicker skated than walked.' };
+    }
     if (this.done && h > TOP - 1) return { key: 'roofframe', line: 'The frame on the roof leads back to the gallery.' };
     if (h > TOP - 1) return { key: 'beam', line: 'There is a beam out of the needle, over everything. The steps go round to it.' };
     if (this.from === 3 && h > 51) return { key: 'windup', loud: true, line: 'The evening wind goes up the wall at the end of this gallery. Jump into it, and hold Space to rise.' };
@@ -480,27 +578,45 @@ export class Dunes {
     this.sky.visible = this.gust.visible = here; for (const b of this.birds) b.g.visible = here; for (const m of this.all) m.visible = here;
     if (!here) { this.was = false; this.lit.visible = false; return ev; }
     const p = player.pos, h = p.y - Y0, sand = duneH(p.x, p.z), onSand = player.grounded && Math.abs(p.y - sand) < 0.4;
-    // (stepping in: it is noon again, whatever hour it was left at)
-    if (!this.was) { this.was = true; this.far = 0; this.day = 0; this.from = 0; this.glid = false; this.wasGround = true; }
+    const under = desertH(p.x, p.z), tr = onSand ? this.top : player.grounded && Math.abs(p.y - under) < 0.4 ? this.low : null, landed = player.grounded && !this.wasGround;
+    this.below = h < -8 && p.y - under < 4;          // (down in the open desert, and not on the chain up out of it)
+    // (stepping in: it is noon again, whatever hour it was left at; and nothing has crossed the sand down here)
+    if (!this.was) {
+      this.was = true; this.far = 0; this.day = 0; this.from = 0; this.glid = false; this.up = false; this.wasGround = true;
+      const m = this.low; m.c.fillStyle = GREY; m.c.fillRect(0, 0, 1024, 1024); m.x0 = p.x - m.size / 2; m.z0 = p.z - m.size / 2; m.dirty = true;
+    }
+    // ---- the open desert has an end, though not one that can be seen: the painter is turned back there
+    { const dx = p.x - LAND.x, dz = p.z - LAND.z, d = Math.hypot(dx, dz); if (d > LAND.keep) { p.x = LAND.x + (dx / d) * LAND.keep; p.z = LAND.z + (dz / d) * LAND.keep; } }
+    // its net of sand goes with the painter, and so does the square of it that keeps marks: moved over by whole dots, so that nothing in it is smudged
+    this.uEye.value.set(Math.round((p.x - X0) * 2) / 2, Math.round((p.z - Z0) * 2) / 2);
+    {
+      const m = this.low, S = 1024 / m.size, du = Math.round((p.x - m.x0 - m.size / 2) * S), dv = Math.round((p.z - m.z0 - m.size / 2) * S);
+      if (this.below && Math.max(Math.abs(du), Math.abs(dv)) > 30 * S) {
+        m.c.globalCompositeOperation = 'copy'; m.c.drawImage(m.c.canvas, -du, -dv);
+        m.c.globalCompositeOperation = 'destination-over'; m.c.fillStyle = GREY; m.c.fillRect(0, 0, 1024, 1024); m.c.globalCompositeOperation = 'source-over';
+        m.x0 += du / S; m.z0 += dv / S; m.dirty = true;
+      }
+      this.uLow.value.set(m.x0 - X0, m.z0 - Z0, m.size);
+    }
 
     // ---- the tower is in the way, at whatever height the painter is; and the needle, on the roof
     if (h > -2 && h < TOP - 0.1) { const dx = p.x - ax(h), dz = p.z - az(h), d = Math.hypot(dx, dz) || 1, need = wall(h) + 0.45; if (d < need) { p.x = ax(h) + (dx / d) * need; p.z = az(h) + (dz / d) * need; } }
     if (h > TOP - 0.5 && h < PERCH + 2) { const dx = p.x - this.needle.x - LX * (h - TOP), dz = p.z - this.needle.z, d = Math.hypot(dx, dz) || 1; if (d < 1.75) { p.x += (dx / d) * (1.75 - d); p.z += (dz / d) * (1.75 - d); } }
 
     // ---- the hour: by how near the tower is, then by how far up it; and it only goes forward
-    const want = h > 12 ? 0.25 + 0.67 * clamp((h - 12.2) / (TOP - 12.2), 0, 1) + (h > PERCH - 1 ? 0.08 : 0) : 0.25 * clamp(1 - (Math.hypot(p.x - TX, p.z - TZ) - 14) / 72, 0, 1);
+    const want = h > 12 ? 0.25 + 0.67 * clamp((h - 12.2) / (TOP - 12.2), 0, 1) + (h > PERCH - 1 ? 0.08 : 0) : h > -8 ? Math.max(0.1, 0.25 * clamp(1 - (Math.hypot(p.x - TX, p.z - TZ) - 14) / 72, 0, 1)) : 0.1 * clamp(1 - Math.hypot(p.x - this.foot.x, p.z - this.foot.z) / 380, 0, 1);
     this.far = Math.max(this.far, want);
     this.day += clamp(this.far - this.day, -0.05 * dt, 0.05 * dt);
     const night = smooth((this.day - 0.66) / 0.3);
 
     // ---- the sand takes the mark of what crosses it
-    if (onSand) {
+    if (tr) {
       const fast = player.surfing;
-      if (!this.wasGround) { const hard = clamp(this.fall / 30, 0.25, 1); this.dig(p.x, p.z, 1.0 + hard * 1.5, 0.55 + hard * 0.4); ev.push({ type: 'dust', x: p.x, y: p.y, z: p.z, n: Math.round(10 + hard * 26), ring: true }); this.stepAt.copy(p); }
+      if (!this.wasGround) { const hard = clamp(this.fall / 30, 0.25, 1); this.dig(p.x, p.z, 1.0 + hard * 1.5, 0.55 + hard * 0.4, tr); ev.push({ type: 'dust', x: p.x, y: p.y, z: p.z, n: Math.round(10 + hard * 26), ring: true }); this.stepAt.copy(p); }
       else if (this.stepAt.distanceToSquared(p) > (fast ? 0.2 : 0.12)) {
         // (a little behind the feet, so that the furrow opens after them)
         const back = Math.hypot(player.vel.x, player.vel.z) || 1;
-        this.dig(p.x - (player.vel.x / back) * 0.4, p.z - (player.vel.z / back) * 0.4, fast ? 0.95 : 0.66, fast ? 0.4 : 0.3);
+        this.dig(p.x - (player.vel.x / back) * 0.4, p.z - (player.vel.z / back) * 0.4, fast ? 0.95 : 0.66, fast ? 0.4 : 0.3, tr);
         if (fast || Math.random() < 0.3) ev.push({ type: 'dust', x: p.x, y: p.y, z: p.z, n: fast ? 3 : 1 });
         this.stepAt.copy(p);
       }
@@ -508,8 +624,12 @@ export class Dunes {
     if (!player.grounded) { this.fall = Math.max(0, -player.vel.y); if (player.gliding) this.glid = true; }
     this.wasGround = player.grounded;
     // the wind fills the marks in again, a little at a time
-    if ((this.tfill += dt) > 6) { this.tfill = 0; const c = this.tctx; c.globalAlpha = 0.06; c.fillStyle = 'rgb(128,128,128)'; c.fillRect(0, 0, 1024, 1024); c.globalAlpha = 1; this.tdirty = true; }
-    if (this.tdirty) { this.tdirty = false; this.trail.needsUpdate = true; }
+    const fill = (this.tfill += dt) > 6; if (fill) this.tfill = 0;
+    for (const m of [this.top, this.low]) {
+      if (fill) { m.c.globalAlpha = 0.06; m.c.fillStyle = GREY; m.c.fillRect(0, 0, 1024, 1024); m.c.globalAlpha = 1; m.dirty = true; }
+      if (m.dirty) { m.dirty = false; m.tex.needsUpdate = true; }
+    }
+    const glided = this.glid;
 
     // ---- the climb. Standing on a gallery (or the roof) makes it the place a fall is taken back to: whoever comes
     // down below it without gliding is carried back up to it. (Gliding down is meant; and once the picture is
@@ -521,6 +641,11 @@ export class Dunes {
         if (!this.glid && !this.done) { player.safe.copy(this.perches[this.from].p); player.floatBack(); ev.push({ type: 'back' }); } else this.from = 0;
       }
       this.glid = false;
+    }
+    // (the island is such a place too: whoever falls from it to the desert below is carried back to the head of the chain)
+    if (player.grounded && !player.lift) {
+      if (h > -6) this.up = true;
+      else if (this.below) { if (this.up && landed && this.fall > 26 && !glided && !this.done) { player.safe.copy(this.head); player.floatBack(); ev.push({ type: 'back' }); } else this.up = false; }
     }
     // the drum throws up whoever lands on it
     if (player.grounded && Math.abs(p.y - this.drumAt.y) < 0.3 && (p.x - this.drumAt.x) ** 2 + (p.z - this.drumAt.z) ** 2 < 2.2) {
@@ -556,6 +681,7 @@ export class Dunes {
       let i = 0; while (i < DUNE_SUN.length - 2 && this.day > DUNE_SUN[i + 1][0]) i++;
       const a = DUNE_SUN[i], b = DUNE_SUN[i + 1], d = this._v.lerpVectors(a[1], b[1], clamp((this.day - a[0]) / (b[0] - a[0]), 0, 1)).normalize(), low = smooth(1 - d.y / 0.45);
       this.sun.position.copy(d).multiplyScalar(1700);
+      this.uShade.value.set((-d.x / Math.max(d.y, 0.2)) * 118, (-d.z / Math.max(d.y, 0.2)) * 118, 0.32 * smooth((d.y - 0.12) / 0.3));          // (where the island's shadow lies on the desert under it)
       this.sun.material.color.setRGB(1, 1 - low * 0.42, 0.92 - low * 0.72);
       this.sun.material.opacity = smooth((d.y + 0.1) / 0.1); this.sun.scale.setScalar(240 + low * 150);
     }
