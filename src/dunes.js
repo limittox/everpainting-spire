@@ -8,8 +8,8 @@ import { DUNE_SUN } from './day.js';
 // The Sunken Tower: another picture in the gallery. A desert adrift in the sky, sand going over its edges; statues
 // that the sand has had for a long time; and a great tower, leaning, sunk in it to half its height.
 //
-//   the way in ..... is across another desert, far under this one: the painter steps in among dunes as high as hills,
-//                    comes over the first of them to see the island adrift a long way off, and gets up onto it by
+//   the way in ..... is across another desert, far under this one: the painter steps in on the top of a hill of sand,
+//                    with the island adrift a long way off; slides down, faster the steeper it is; and gets up onto it by
 //                    the one chain, of the four that held it, which still reaches the sand.
 //   the sand ....... keeps the mark of whatever crosses it: a furrow behind the painter, a wider one behind a
 //                    skating painter, a hollow where they land, a scoop where the brush strikes. The wind fills
@@ -26,7 +26,9 @@ const X0 = 12000, Y0 = 0, Z0 = 1000, R0 = 78, HALF = 92;        // (the sand tha
 // the open desert far under the island: how low it lies, where its ground is centred, how far that reaches and how
 // far it may be walked; where the frame stands in it (east and south of the island's middle); and the one chain that
 // still holds, from the island's rim down to the top of a great dune
-const LOW = Y0 - 130, LAND = { x: X0, z: Z0 + 250, r: 420, keep: 345 }, ENTER = [0, 560];
+const LOW = Y0 - 130, LAND = { x: X0, z: Z0 + 290, r: 470, keep: 380 }, ENTER = [0, 630];
+// the mirage: where it lies (east and south of the island's middle), the level of the pan of sand round it, and of its water
+const MIRAGE = [145, 372], PAN = LOW + 3, WATER = PAN - 1.4;
 const CH = deg(64), HEAD_R = rimR({ r: R0, ph: 0.9 }, CH) - 3, FOOT = [Math.cos(CH) * (HEAD_R + 130), Math.sin(CH) * (HEAD_R + 130)];
 const START = new V3(X0 + Math.cos(CH) * HEAD_R, 0, Z0 + Math.sin(CH) * HEAD_R);       // where the chain lets the painter onto the island
 // the tower: where it stands, how far it leans for every unit it rises, and how wide it is at a height
@@ -55,18 +57,23 @@ function duneH(x, z) {
 
 // The open desert: dunes as high as hills. The same arithmetic is read by the game (how high is the ground?) and by
 // the shader that draws the sand, so it is written once, in the shader's language, and the game's copy is made from
-// it. (u is east and v is south of the island's middle.) The first great dune stands between the frame and everything
-// else; the second is the one the chain comes down to; and far out, where nobody walks, they are mountains.
+// it. (u is east and v is south of the island's middle.) The first great dune is a hill the frame stands on the top of,
+// with everything else spread out below it (steepest at the very top and easing all the way down, like a slide, so that
+// no shoulder of it stands in the way of the view); the second is the one the chain comes down to; and far out, where nobody walks, they are mountains.
+// Off to one side the ground is levelled into a pan with a hollow in it and a hummock in the middle of the hollow: the
+// bed of the mirage, which is all that is really there.
 const DESERT = `
   float t1 = v * 0.0165 + 0.55 * sin(u * 0.0062 + 1.3) + 0.9, s1 = sin(t1 + 0.3 * sin(2.0 * t1));
   float t2 = (u * 0.8 + v * 0.6) * 0.045 + 0.8 * sin((u * 0.6 - v * 0.8) * 0.021), s2 = sin(t2);
   float t3 = (u * 0.35 - v * 0.94) * 0.0052 + 0.7 * sin(u * 0.0031 + v * 0.0023) + 2.0, s3 = sin(t3);
-  float calm = smoothstep(6.0, 30.0, sqrt(u * u + (v - ${ENTER[1].toFixed(1)}) * (v - ${ENTER[1].toFixed(1)}))), rim = smoothstep(430.0, 1000.0, sqrt(u * u + (v - 250.0) * (v - 250.0)));
-  float e1 = (v - 500.0 - 26.0 * sin(u * 0.009)) / 40.0, e2 = ((u - ${FOOT[0].toFixed(2)}) * (u - ${FOOT[0].toFixed(2)}) + (v - ${FOOT[1].toFixed(2)}) * (v - ${FOOT[1].toFixed(2)})) / 3600.0;
-  return ${LOW.toFixed(1)} + 34.0 * (1.0 - sqrt(s1 * s1 + 0.004)) * (0.6 + 0.4 * sin(u * 0.004 + v * 0.003 + 2.0)) + 4.5 * calm * (1.0 - sqrt(s2 * s2 + 0.01))
-    + 38.0 * exp(-e1 * e1) + 62.0 * exp(-e2) + 70.0 * rim * (1.0 - sqrt(s3 * s3 + 0.004));
+  float calm = smoothstep(6.0, 30.0, sqrt(u * u + (v - ${ENTER[1].toFixed(1)}) * (v - ${ENTER[1].toFixed(1)}))), rim = smoothstep(450.0, 1000.0, sqrt(u * u + (v - 290.0) * (v - 290.0)));
+  float e1 = sqrt(u * u + (v - ${(ENTER[1] + 8.5).toFixed(1)}) * (v - ${(ENTER[1] + 8.5).toFixed(1)})), e2 = ((u - ${FOOT[0].toFixed(2)}) * (u - ${FOOT[0].toFixed(2)}) + (v - ${FOOT[1].toFixed(2)}) * (v - ${FOOT[1].toFixed(2)})) / 3600.0;
+  float h = ${LOW.toFixed(1)} + 34.0 * (1.0 - sqrt(s1 * s1 + 0.004)) * (0.6 + 0.4 * sin(u * 0.004 + v * 0.003 + 2.0)) + 4.5 * calm * (1.0 - sqrt(s2 * s2 + 0.01))
+    + 125.0 * exp(-(sqrt(e1 * e1 + 144.0) - 12.0) / 95.0) * (1.0 - smoothstep(150.0, 270.0, e1)) + 62.0 * exp(-e2) + 70.0 * rim * (1.0 - sqrt(s3 * s3 + 0.004));
+  float px = u - ${MIRAGE[0].toFixed(1)}, pz = v - ${MIRAGE[1].toFixed(1)}, pd = px * px + pz * pz, pr = sqrt(px * px * 0.72 + pz * pz) + 3.0 * sin(px * 0.13 + 1.0) + 2.5 * sin(pz * 0.17);
+  return mix(h, ${PAN.toFixed(1)} - 5.2 * exp(-pr * pr / 400.0) + 5.4 * exp(-pd / 70.0), 1.0 - smoothstep(38.0, 60.0, sqrt(pd)));
 `;
-const desert0 = new Function('u', 'v', 'const { sin, exp, sqrt } = Math, smoothstep = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); };' + DESERT.replace(/float /g, 'let '));
+const desert0 = new Function('u', 'v', 'const { sin, exp, sqrt } = Math, smoothstep = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); }, mix = (a, b, t) => a + (b - a) * t;' + DESERT.replace(/float /g, 'let '));
 const desertH = (x, z) => desert0(x - X0, z - Z0);
 
 const GREY = 'rgb(128,128,128)';
@@ -132,25 +139,26 @@ export class Dunes {
     const lowAt = (dx, dz, lift = 0) => new V3(X0 + dx, desertH(X0 + dx, Z0 + dz) + lift, Z0 + dz);
 
     // ---- the open desert, far under all this: ground of its own, as far as it can be walked
-    this.land = { name: 'The Sunken Tower', x: LAND.x, y: LOW - 5, z: LAND.z, r: LAND.r, ph: 0.4, pale: true, quiet: true, bare: true, surf: desertH, index: world.islands.length };
+    this.land = { name: 'The Sunken Tower', x: LAND.x, y: LOW - 5, z: LAND.z, r: LAND.r, ph: 0.4, pale: true, quiet: true, bare: true, surf: desertH, under: 2.5, index: world.islands.length };
     world.islands.push(this.land);
     {
       // its sand is one net that goes with the painter: fine about their feet, where it is pressed down like the sand
       // above, and coarser the farther off it is, out to the end of sight. The island's shadow lies on it.
       this.uEye = { value: new THREE.Vector2() }; this.uLow = { value: new THREE.Vector3() }; this.uShade = { value: new THREE.Vector3() };
       const mat = paintify(new THREE.MeshLambertMaterial({ color: 0xe8c486 }), { scale: 1, amp: 0.3 }), painted = mat.onBeforeCompile;
-      const glsl = `uniform vec2 uEye; uniform sampler2D tTrail; uniform vec3 uTrail; uniform vec3 uShade; varying vec2 vSand;
+      const glsl = `uniform vec2 uEye; uniform sampler2D tTrail; uniform vec3 uTrail; uniform vec3 uShade; uniform float uMirage; varying vec2 vSand;
         float desertH(float u, float v) {${DESERT}}
         float pressed(vec2 w) { vec2 q = (w - uTrail.xy) / uTrail.z; return q.x > 0.0 && q.y > 0.0 && q.x < 1.0 && q.y < 1.0 ? texture2D(tTrail, q).r - 0.5 : 0.0; }\n`;
       mat.onBeforeCompile = (sh, r) => {
         painted.call(mat, sh, r);
-        Object.assign(sh.uniforms, { uEye: this.uEye, uTrail: this.uLow, uShade: this.uShade, tTrail: { value: this.low.tex } });
+        Object.assign(sh.uniforms, { uEye: this.uEye, uTrail: this.uLow, uShade: this.uShade, tTrail: { value: this.low.tex }, uMirage: this.uFade });
         sh.vertexShader = glsl + sh.vertexShader.replace('#include <begin_vertex>', `vec2 gq = position.xy * (64.0 + 1336.0 * position.xy * position.xy * position.xy * position.xy);
           vSand = uEye + vec2(gq.x, -gq.y);
           vec3 transformed = vec3(vSand.x, desertH(vSand.x, vSand.y) + pressed(vSand) * 1.3, vSand.y);`);
         sh.fragmentShader = glsl + sh.fragmentShader
           .replace('#include <map_fragment>', `#include <map_fragment>\n  float sandH = desertH(vSand.x, vSand.y);
-            diffuseColor.rgb *= (1.0 + pressed(vSand) * 1.5) * (1.0 - uShade.z * (1.0 - smoothstep(52.0, 86.0, length(vSand - uShade.xy)))) * mix(vec3(0.84, 0.77, 0.7), vec3(1.05, 1.04, 1.0), smoothstep(${LOW.toFixed(1)}, ${(LOW + 44).toFixed(1)}, sandH));          // (deeper in the hollows, paler on the crests)`)
+            diffuseColor.rgb *= (1.0 + pressed(vSand) * 1.5) * (1.0 - uShade.z * (1.0 - smoothstep(52.0, 86.0, length(vSand - uShade.xy)))) * mix(vec3(0.84, 0.77, 0.7), vec3(1.05, 1.04, 1.0), smoothstep(${LOW.toFixed(1)}, ${(LOW + 44).toFixed(1)}, sandH))
+              * (1.0 - 0.34 * uMirage * (1.0 - smoothstep(${(WATER + 0.05).toFixed(2)}, ${(WATER + 0.85).toFixed(2)}, sandH)) * (1.0 - smoothstep(33.0, 39.0, distance(vSand, vec2(${MIRAGE[0].toFixed(1)}, ${MIRAGE[1].toFixed(1)})))));          // (deeper in the hollows, paler on the crests)`)
           // (lit by how the dune slopes, which is worked out here and not at the corners of the net: so a far dune is as crisp as a near one)
           .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n  { float e = 0.16, h0 = sandH;
             float hx = pressed(vSand + vec2(e, 0.0)) - pressed(vSand - vec2(e, 0.0)), hz = pressed(vSand + vec2(0.0, e)) - pressed(vSand - vec2(0.0, e));
@@ -427,7 +435,8 @@ export class Dunes {
       T(place(new THREE.CylinderGeometry(0.4, 0.9, 2.0, 8), -3.4, TOP + 1.0, -1.5)); fire(world0(-3.4, TOP + 7.4, -1.5), 9, 0xfff0c0, 0.7);
       this.perches.push({ p: world0(1.5, TOP, -1.8), h: TOP });
       // the two frames that lead back to the gallery: one where the painter comes in, out in the open desert, and one on the roof
-      this.frames = [{ at: lowAt(ENTER[0], ENTER[1]), face: new V3(X0, 0, Z0) },{ at: world0(-0.5, TOP, 3.6), face: world0(1.5, TOP, -1) }];
+      // (the first stands side-on at the top of the hill, so that whoever steps out of it is looking down the slope at the island)
+      this.frames = [{ at: lowAt(ENTER[0] - 6, ENTER[1]), face: lowAt(ENTER[0] + 30, ENTER[1]) }, { at: world0(-0.5, TOP, 3.6), face: world0(1.5, TOP, -1) }];
     }
     // (the lean, last of all)
     const lean = new THREE.Matrix4().set(1, LX, 0, TX, 0, 1, 0, Y0, 0, LZ, 1, TZ, 0, 0, 0, 1);
@@ -466,6 +475,139 @@ export class Dunes {
     this.mesh = bag.mesh(stoneMat()); this.mesh.material.side = THREE.DoubleSide; this.mesh.frustumCulled = false;
     scene.add(this.mesh);
     this.all = [this.sand, this.lowSand, this.tower, this.mesh, this.ring, this.drum];          // (not drawn while the painter is somewhere else)
+
+    // a mirage: an oasis in a pan of sand off to the right of the way down. Water with the sky in it, palms on an islet
+    // in the middle, reeds along the shore. It is plain from the hill and from far off; it shivers and thins as it is
+    // come to, and where it was there is a dry hollow. (Noon makes it: by evening it is gone.)
+    {
+      const rs = mulberry32(4421), C = lowAt(MIRAGE[0], MIRAGE[1]), bag2 = new Bag(), one = new V3(1, 1, 1);
+      const LEAF = ['#3f8a4a', '#2f7440', '#56a052', '#6fb45a', '#256638'], RIB = ['#8aa054', '#6f8a44'], DRY = ['#b89a58', '#9a7e46', '#c8ac6a'];
+      const BARK = ['#8d7355', '#7a6248', '#a08566', '#6b553e'], REED = ['#4a7a3e', '#3a6a36', '#6a9048', '#8aa24e'], HEART = ['#9aa860', '#b0a868'];
+      const soup = (arr) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); return g; };
+      /** A palm: a ringed trunk that bends as it rises, and a crown of feathered fronds, the young ones standing and the old ones hanging. */
+      const palmTree = (base, tall, lean) => {
+        const at = (s) => new V3(base.x + lean.x * s * s, base.y - 0.4 + tall * s, base.z + lean.z * s * s), R = (s) => (0.2 + tall * 0.028) * (1 - 0.5 * s) + 0.3 * Math.exp(-s * 16), N = 13;
+        for (let i = 0; i < N; i++) {
+          const a = at(i / N), b = at((i + 1) / N), dir = b.clone().sub(a), len = dir.length();
+          const g = new THREE.CylinderGeometry(R((i + 1) / N) * 1.13, R(i / N) * 0.93, len * 1.05, 8);          // (each length a little wider at its top than the next is at its foot: the rings of the bark)
+          g.applyMatrix4(new THREE.Matrix4().compose(a.clone().lerp(b, 0.5), new THREE.Quaternion().setFromUnitVectors(UP, dir.normalize()), one));
+          bag2.add(daub(g, BARK, { scale: 0.9, spread: 1 }));
+        }
+        const top = at(1), n = 15 + Math.round(tall * 0.25);
+        bag2.add(daub(place(new THREE.IcosahedronGeometry(R(1) * 1.9, 1), top.x, top.y + 0.1, top.z, 0, 0, 0, 1, 1.35, 1), HEART));
+        for (let k = 0; k < n; k++) {
+          const old = k % 5 === 4, az = k * 2.4 + rs() * 0.5, hx = Math.cos(az), hz = Math.sin(az), side = new V3(-hz, 0, hx);
+          const e0 = old ? -0.5 - rs() * 0.4 : 1.15 - (k / n) * 1.3 + (rs() - 0.5) * 0.25, droop = old ? 0.9 : 1.5 + rs() * 0.6, Lf = tall * (0.36 + rs() * 0.1) + 2.2, S = 13;
+          const leaf = [], rib = [], p = top.clone();
+          let was = null;
+          for (let j = 0; j <= S; j++) {
+            const t = j / S, e = e0 - droop * t * t, tan = new V3(hx * Math.cos(e), Math.sin(e), hz * Math.cos(e)), upL = new V3().crossVectors(side, tan);
+            if (was) { const w = 0.1 * (1 - t) + 0.025, a = was.clone().addScaledVector(side, -w), b = was.clone().addScaledVector(side, w), c = p.clone().addScaledVector(side, w), d = p.clone().addScaledVector(side, -w); rib.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z); }
+            if (t > 0.1) {
+              // the leaflets: a pair at every step along the rib, longest at the middle of it, hanging more toward its end
+              const ll = Lf * 0.3 * Math.sin(Math.PI * (0.06 + 0.9 * t)) ** 0.75, hang = 0.45 + 0.4 * t + (old ? 0.5 : 0), half = (Lf / S) * 0.42;
+              for (const sgn of [-1, 1]) {
+                const tip = p.clone().addScaledVector(side, sgn * ll * Math.cos(hang)).addScaledVector(upL, -ll * Math.sin(hang)).addScaledVector(tan, ll * 0.35), a = p.clone().addScaledVector(tan, -half), b = p.clone().addScaledVector(tan, half);
+                leaf.push(a.x, a.y, a.z, b.x, b.y, b.z, tip.x, tip.y, tip.z);
+              }
+            }
+            was = p.clone(); p.addScaledVector(tan, Lf / S);
+          }
+          bag2.add(daub(soup(leaf), old ? DRY : LEAF, { scale: 0.25, spread: 1 })); bag2.add(daub(soup(rib), old ? DRY : RIB, {}));
+        }
+        for (let k = 0; k < 5; k++) bag2.add(daub(place(new THREE.IcosahedronGeometry(0.2 + tall * 0.016, 1), top.x + Math.cos(k * 1.3) * R(1) * 2, top.y - 0.55 - (k % 2) * 0.3, top.z + Math.sin(k * 1.3) * R(1) * 2), k % 2 ? BARK : HEART));
+      };
+      /** A clump of blades: grass, or reeds if they are tall. */
+      const tuft = (c, tall, n, pal) => {
+        const g = [];
+        for (let i = 0; i < n; i++) {
+          const a = rs() * TAU, r = rs() * 0.25 * tall + 0.1, lean = 0.2 + rs() * 0.5, h = tall * (0.55 + rs() * 0.55), w = 0.05 + tall * 0.035, bx = c.x + Math.cos(a) * r, bz = c.z + Math.sin(a) * r, wx = Math.cos(a + 1.57) * w, wz = Math.sin(a + 1.57) * w;
+          g.push(bx - wx, c.y - 0.15, bz - wz, bx + wx, c.y - 0.15, bz + wz, bx + Math.cos(a) * h * lean, c.y + h, bz + Math.sin(a) * h * lean);
+        }
+        bag2.add(daub(soup(g), pal, { scale: 0.5, spread: 1 }));
+      };
+      const stone = (c, s) => bag2.add(daub(place(new THREE.IcosahedronGeometry(s, 0), c.x, c.y + s * 0.2, c.z, rs() * 3, rs() * 3, 0, 1.3, 0.6, 1), ROCK, { scale: 0.6, spread: 1 }));
+      const here = (dx, dz, lift = 0) => lowAt(MIRAGE[0] + dx, MIRAGE[1] + dz, lift);
+      // three palms on the islet, leaning apart; grass under them
+      palmTree(here(-0.6, 0.4), 15, new V3(4.4, 0, 1.4)); palmTree(here(1.9, -1.3), 10.5, new V3(-3.6, 0, -1.8)); palmTree(here(-2.3, -1.9), 6.2, new V3(-1.0, 0, 2.6));
+      for (let i = 0; i < 16; i++) { const a = rs() * TAU, r = 0.8 + rs() * 3.6; tuft(here(Math.cos(a) * r, Math.sin(a) * r), 0.7 + rs() * 0.8, 7, LEAF); }
+      stone(here(3.0, 1.6), 0.9); stone(here(-3.2, 2.2), 0.6);
+      // and along the shore, wherever the water meets the sand: reeds standing in it, grass above it, a stone here and there
+      for (let k = 0; k < 13; k++) {
+        const a = (k / 13) * TAU + rs() * 0.3, cx = Math.cos(a), cz = Math.sin(a);
+        let r = 9; while (r < 52 && desertH(C.x + cx * r, C.z + cz * r) < WATER) r += 0.5;
+        if (r >= 52) continue;
+        if (k % 3 !== 2) for (let i = 0; i < 3; i++) { const q = here(cx * (r - 0.6 - i * 0.5) + (rs() - 0.5) * 2.4, cz * (r - 0.6 - i * 0.5) + (rs() - 0.5) * 2.4); q.y = Math.max(q.y, WATER - 0.5); tuft(q, 2.0 + rs() * 1.2, 9, REED); }
+        for (let i = 0; i < 3; i++) tuft(here(cx * (r + 1 + rs() * 2.5) + (rs() - 0.5) * 3, cz * (r + 1 + rs() * 2.5) + (rs() - 0.5) * 3), 0.6 + rs() * 0.6, 6, LEAF);
+        if (k % 4 === 1) stone(here(cx * (r + 0.4), cz * (r + 0.4)), 0.5 + rs() * 0.6);
+      }
+      // (what is not there shivers a little even when it is all there, and comes apart in bands as it goes)
+      this.uFade = { value: 1 }; this.uCamL = { value: new V3() };
+      const band = 'smoothstep(0.0, 1.0, uFade * 1.7 - 0.7 * (0.5 + 0.5 * sin(gl_FragCoord.y * 0.3 + uTime * 5.0)))';
+      const green = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, transparent: true, side: THREE.DoubleSide }), { scale: 1.1, amp: 0.45 }), painted = green.onBeforeCompile;
+      green.onBeforeCompile = (sh, r) => {
+        painted.call(green, sh, r);
+        sh.uniforms.uTime = uTime; sh.uniforms.uFade = this.uFade;
+        sh.vertexShader = 'uniform float uTime, uFade;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed.x += sin(transformed.y * 0.7 + uTime * 2.6) * (0.03 + 0.5 * (1.0 - uFade));');
+        sh.fragmentShader = 'uniform float uTime, uFade;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>\n  diffuseColor.a *= ${band};`);
+      };
+      green.customProgramCacheKey = () => 'mirage';
+      const trees = bag2.mesh(green);
+      // the water. How deep it is anywhere is worked out from the same ground the painter walks on, so its shore is
+      // wherever the sand comes up through it. Pale and green in the shallows, darker out in the middle; the sky lies on
+      // it, more of it the flatter it is looked across; and the palms stand in it upside down.
+      const f1 = (v) => v.toFixed(2), P = [[here(-0.6, 0.4), 15, 4.4, 1.4, 6.6], [here(1.9, -1.3), 10.5, -3.6, -1.8, 5.2]];
+      const water = new THREE.Mesh(new THREE.PlaneGeometry(130, 130).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, fog: true,
+        uniforms: Object.assign(THREE.UniformsUtils.clone(THREE.UniformsLib.fog), { uTime, uFade: this.uFade, uCamL: this.uCamL, uOrigin: { value: new THREE.Vector2(X0, Z0) } }),
+        vertexShader: `uniform vec2 uOrigin; varying vec2 vS;
+          #include <fog_pars_vertex>
+          void main() {
+            vec4 wp = modelMatrix * vec4(position, 1.0); vS = wp.xz - uOrigin;
+            vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
+            #include <fog_vertex>
+          }`,
+        fragmentShader: `uniform float uTime, uFade; uniform vec3 uCamL; varying vec2 vS;
+          #include <fog_pars_fragment>
+          float desertH(float u, float v) {${DESERT}}
+          // how much of a palm's upside-down shape lies on the water at q: a palm standing at c, so tall, leaning so, with a crown so wide
+          float palm(vec2 q, vec2 c, float tall, vec2 lean, float crown, float camH) {
+            vec2 toCam = uCamL.xz - c; float D = length(toCam); vec2 d = toCam / D;
+            float t = dot(q - c, d), s = dot(q - c, vec2(-d.y, d.x));
+            if (t <= 0.0 || t >= D * 0.9) return 0.0;
+            float hgt = camH * t / (D - t), lat = s * D / (D - t), x1 = dot(lean, vec2(-d.y, d.x)), x0 = x1 * (hgt / tall) * (hgt / tall);
+            float trunk = (1.0 - smoothstep(0.3, 0.62, abs(lat - x0))) * (1.0 - step(tall, hgt));
+            vec2 r = vec2(lat - x1, hgt - tall); float a = atan(r.y, r.x);
+            float fronds = 1.0 - smoothstep(0.7, 1.0, length(r) / (crown * (0.42 + 0.58 * abs(cos(a * 3.5 + 0.6)))));
+            return max(trunk, fronds);
+          }
+          vec3 L(float r, float g, float b) { return pow(vec3(r, g, b), vec3(2.2)); }
+          void main() {
+            float depth = ${f1(WATER)} - desertH(vS.x, vS.y);
+            if (depth < 0.0 || distance(vS, vec2(${f1(C.x - X0)}, ${f1(C.z - Z0)})) > 37.0) discard;
+            vec2 rp = vec2(sin(vS.x * 1.7 + uTime * 1.1 + sin(vS.y * 0.9) * 1.3), sin(vS.y * 2.1 - uTime * 0.9 + sin(vS.x * 0.7) * 1.7));
+            vec3 N = normalize(vec3(rp.x * 0.04, 1.0, rp.y * 0.04)), V = normalize(uCamL - vec3(vS.x, ${f1(WATER)}, vS.y)), R = reflect(-V, N);
+            float across = pow(1.0 - max(dot(N, V), 0.0), 2.5);
+            vec3 sky = mix(L(0.74, 0.86, 0.97), L(0.34, 0.58, 0.95), smoothstep(0.02, 0.7, R.y));
+            vec3 body = mix(L(0.40, 0.80, 0.72), L(0.05, 0.33, 0.50), smoothstep(0.05, 2.6, depth));
+            vec3 col = mix(body, sky, 0.16 + 0.62 * across);
+            vec2 q = vS + rp * 0.22; float camH = uCamL.y - ${f1(WATER)};
+            float shade = max(palm(q, vec2(${f1(P[0][0].x - X0)}, ${f1(P[0][0].z - Z0)}), ${f1(P[0][1])}, vec2(${f1(P[0][2])}, ${f1(P[0][3])}), ${f1(P[0][4])}, camH), palm(q, vec2(${f1(P[1][0].x - X0)}, ${f1(P[1][0].z - Z0)}), ${f1(P[1][1])}, vec2(${f1(P[1][2])}, ${f1(P[1][3])}), ${f1(P[1][4])}, camH));
+            col = mix(col, L(0.10, 0.26, 0.16), shade * 0.7 * smoothstep(0.1, 0.8, depth));
+            // a glitter, small and sharp, that comes and goes
+            col += vec3(1.0, 0.97, 0.86) * smoothstep(0.93, 1.0, sin(vS.x * 2.9 + uTime * 1.9 + rp.y) * sin(vS.y * 3.4 - uTime * 1.5 + rp.x)) * 0.55;
+            // the edge: a pale line where it laps, then the sand showing through the shallows
+            float lap = depth + 0.05 * sin(uTime * 1.4 + vS.x * 0.8 + vS.y * 0.6);
+            col = mix(L(0.97, 0.95, 0.88), col, smoothstep(0.03, 0.16, lap));
+            gl_FragColor = vec4(col, smoothstep(0.0, 0.08, depth) * (0.62 + 0.36 * smoothstep(0.1, 1.6, depth)) * ${band});
+            #include <fog_fragment>
+          }`,
+      }));
+      water.position.set(C.x, WATER, C.z);
+      this.mirageAt = C; this.mirage = new THREE.Group(); this.mirage.add(water, trees); this.mirage.visible = false;
+      this.mirage.traverse((m) => { m.frustumCulled = false; });
+      scene.add(this.mirage);
+    }
 
     // the sky of this picture: a sun that can be seen going down, and then every star there is
     this.sky = new THREE.Group(); this.sky.visible = false;
@@ -553,10 +695,11 @@ export class Dunes {
     if (!this.contains(p)) return null;
     const h = p.y - Y0, near = (q, r) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < r * r;
     if (this.below) {
+      if (near(this.mirageAt, 24)) return { key: 'mirage', line: 'There was water here, and a tree. From up there, there was.' };
       if (near(this.foot, 34)) return { key: 'chain', line: 'This chain still holds. Its links are broad enough to walk up.' };
       if (near(this.isl, 230)) return { key: 'chains', line: 'Chains held it to the desert once. Most have parted: one still comes down to the sand, on the top of the great dune.' };
-      if (p.z < Z0 + 465) return { key: 'adrift', line: 'There: a desert of its own, adrift over this one.' };
-      return { key: 'vast', line: 'It is a long way, over the dunes. They are quicker skated than walked.' };
+      if (p.z > Z0 + ENTER[1] - 30) return { key: 'adrift', line: 'There: a desert of its own, adrift over this one. And a long way down to it.' };
+      return { key: 'vast', line: 'Sand this steep is not for walking. Go with it.' };
     }
     if (this.done && h > TOP - 1) return { key: 'roofframe', line: 'The frame on the roof leads back to the gallery.' };
     if (h > TOP - 1) return { key: 'beam', line: 'There is a beam out of the needle, over everything. The steps go round to it.' };
@@ -575,10 +718,11 @@ export class Dunes {
 
   update(dt, t, player, camera) {
     const ev = this.events.splice(0), here = !!player && this.contains(player.pos);
-    this.sky.visible = this.gust.visible = here; for (const b of this.birds) b.g.visible = here; for (const m of this.all) m.visible = here;
-    if (!here) { this.was = false; this.lit.visible = false; return ev; }
+    this.sky.visible = this.gust.visible = this.mirage.visible = here; for (const b of this.birds) b.g.visible = here; for (const m of this.all) m.visible = here;
+    if (!here) { this.was = false; this.sandy = false; this.lit.visible = false; return ev; }
     const p = player.pos, h = p.y - Y0, sand = duneH(p.x, p.z), onSand = player.grounded && Math.abs(p.y - sand) < 0.4;
     const under = desertH(p.x, p.z), tr = onSand ? this.top : player.grounded && Math.abs(p.y - under) < 0.4 ? this.low : null, landed = player.grounded && !this.wasGround;
+    if (player.grounded) this.sandy = tr === this.low;          // (loose sand underfoot, or last underfoot: the painter slides on it)
     this.below = h < -8 && p.y - under < 4;          // (down in the open desert, and not on the chain up out of it)
     // (stepping in: it is noon again, whatever hour it was left at; and nothing has crossed the sand down here)
     if (!this.was) {
@@ -608,6 +752,11 @@ export class Dunes {
     this.far = Math.max(this.far, want);
     this.day += clamp(this.far - this.day, -0.05 * dt, 0.05 * dt);
     const night = smooth((this.day - 0.66) / 0.3);
+    // the mirage: all there from far off and from the last rise before it, going as it is come down to, gone before its shore is reached; and gone with the noon
+    {
+      const fade = smooth((Math.hypot(p.x - this.mirageAt.x, p.z - this.mirageAt.z) - 48) / 165) * (1 - smooth((this.day - 0.1) / 0.12));
+      this.mirage.visible = fade > 0.01; this.uFade.value = fade; this.uCamL.value.set(camera.position.x - X0, camera.position.y, camera.position.z - Z0);
+    }
 
     // ---- the sand takes the mark of what crosses it
     if (tr) {

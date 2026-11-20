@@ -1091,6 +1091,7 @@ function updatePlay(dt, t) {
   if (pressed.has('KeyQ') || pressed.has('NextPaint')) setPaint(paints[(paints.indexOf(game.paint) + 1) % paints.length]);
   paints.forEach((p, k) => { if (k < 10 && pressed.has('Digit' + ((k + 1) % 10))) setPaint(p); });
 
+  player.slick = dunes.contains(player.pos) && dunes.sandy ? 1 : 0;          // (the open desert's sand is loose: steep, it is slid down)
   player.updraft = under.contains(player.pos) ? seedbed.thermal(player.pos) : dunes.contains(player.pos) ? dunes.thermal(player.pos) : tubes.thermal(player.pos);
   if (player.updraft > 0 && player.gliding) hint('rising', 'Keep Space held to rise with the warm air, then glide.', 6500);
   const events = player.update(dt, t, input, view.yaw, world);

@@ -812,7 +812,8 @@ export function buildWorld(scene, uTime) {
       if (d2 > lim * lim) continue;
       if (Math.sqrt(d2) <= rimR(isl, Math.atan2(dz, dx))) {
         const h = surfY(isl, x, z);
-        if (h <= maxY && h > best) best = h;
+        // (steep ground may say how far under it still counts as on it, for whoever has gone at it fast)
+        if (h <= maxY + (isl.under || 0) && h > best) best = h;
       }
     }
     const land = best;           // the island underfoot here, if there is one

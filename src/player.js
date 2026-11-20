@@ -68,6 +68,7 @@ export class Player {
     this.heading = Math.PI;
     this.grounded = false; this.jumps = 0; this.airTime = 0;
     this.gliding = false; this.surfing = false; this.slope = 0;
+    this.slick = 0; this.rush = 0;        // loose sand underfoot (set by the game, in the desert); and the speed a steep slope of it has lent
     this.ride = null; this.rideCd = 0;      // carried by a wind current
     this.lift = null;                        // being floated back after a fall
     this.walk = 0; this.swingT = -1; this.swingCd = 0;
@@ -81,7 +82,7 @@ export class Player {
   }
 
   teleport(p, heading = Math.PI) {
-    this.pos.copy(p); this.vel.set(0, 0, 0); this.heading = this.prevH = heading; this.safe.copy(p);
+    this.pos.copy(p); this.vel.set(0, 0, 0); this.heading = this.prevH = heading; this.safe.copy(p); this.rush = 0;
     this.ride = null; this.lift = null; this.seat = null;
     this.ribbons.forEach((r) => { r.init = false; });
     this.cape.reset();
@@ -168,10 +169,15 @@ export class Player {
     let mx = fx * input.mz + rx * input.mx, mz = fz * input.mz + rz * input.mx;
     const ml = Math.hypot(mx, mz);
     if (ml > 1) { mx /= ml; mz /= ml; }
-    this.surfing = input.surf && this.grounded && ml > 0.1;
+    // (steep loose sand is slid down whether or not it is meant, and for as long as the speed lasts)
+    this.surfing = (input.surf || (this.slick && (this.slope < -0.25 || this.rush > 3))) && this.grounded && ml > 0.1;
+    // the steeper the sand the faster; and the speed is kept for a while after the slope has run out, in the air too
+    const lent = this.surfing && this.slick ? clamp(-this.slope * 48 - 5, 0, 26) : 0;
+    this.rush += (lent - this.rush) * (1 - Math.exp(-(lent > this.rush ? 2.2 : this.grounded && !this.surfing ? 5 : 0.5) * dt));
     let speed = 8.6;
     if (this.surfing) speed = 14.5 + clamp(-this.slope * 16, -3, 6);     // skating: faster downhill
     else if (this.gliding) speed = 11;
+    speed += this.rush;
     const k = 1 - Math.exp(-(this.grounded ? (this.surfing ? 5 : 14) : 5.5) * dt);
     this.vel.x += (mx * speed - this.vel.x) * k;
     this.vel.z += (mz * speed - this.vel.z) * k;
