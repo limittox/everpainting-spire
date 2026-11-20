@@ -1274,7 +1274,7 @@ function updatePlay(dt, t) {
   } else if (world.bridges[3].progress < 1) { goal = world.bridges[3].anchor; objective = 'Lay the last bridge to the Spire'; }
   else { goal = world.gate; objective = 'Step up to the glowing gate'; }
   if (pale) { goal = null; objective = !under.done ? 'Bring the Dry Stair its water' : !seedbed.grown ? 'Grow the way on' : !seedbed.lit ? 'Cross to the Kiln on warm air' : !lastpage.cleared ? 'Ride the Kiln\u2019s warm air north' : !lastpage.done ? 'Fill the four wells' : 'It is morning'; }      // nothing in the first level to point at from here
-  if (hung) { goal = gallery.goal(player.pos); objective = gallery.grey || gallery.ended ? '' : gallery.slipped ? 'One of the dust sheets has come off' : hung === 'dunes' ? (dunes.done ? 'The picture is finished' : dunes.below ? 'Reach the desert that is adrift' : 'Climb the sunken tower') : hung === 'tubes' ? (tubes.done ? 'The picture is finished' : 'Mix what the picture is missing') : 'Two pictures are hung. Finish them both'; }
+  if (hung) { goal = gallery.goal(player.pos); objective = gallery.grey || gallery.ended ? '' : gallery.slipped ? 'One of the dust sheets has come off' : hung === 'dunes' ? (dunes.done ? 'The picture is finished' : dunes.below ? (dunes.asked && !dunes.open ? 'Draw a ring round what is real' : 'Reach the desert that is adrift') : 'Climb the sunken tower') : hung === 'tubes' ? (tubes.done ? 'The picture is finished' : 'Mix what the picture is missing') : 'Two pictures are hung. Finish them both'; }
   hud.objective(objective);
   game.guideT -= dt;
   if (goal && game.guideT <= 0 && !player.ride && !player.lift) {
@@ -1431,6 +1431,9 @@ function tick(dt) {
     if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
     else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
     else if (ev.type === 'back') sound.play('wind');
+    else if (ev.type === 'ring') { sound.pluck(true); fx.burst(ev.at, 40, { speed: 6, up: 7, colors: ['#fff6d0', '#ffd060', '#ff9a3a'], size: 0.42, life: 1.2, boost: 1.5 }); }
+    else if (ev.type === 'orb') { sound.play('spark'); fx.burst(ev.at, 30, { speed: 5, up: 6, colors: ['#fff6d0', '#ffd060', '#ffffff'], size: 0.4, life: 1.1, boost: 1.5 }); }
+    else if (ev.type === 'gate') { sound.play('bridge'); sound.pluck(true); fx.burst(ev.at, 70, { speed: 7, up: 8, colors: ['#8ff6ff', '#58d0c0', '#ffffff', '#ffd060'], size: 0.45, life: 1.4, gravity: 5, boost: 1.5 }); saveSoon(); }
     else if (ev.type === 'tile') { sound.chime(ev.n); sound.whoosh(500, 1900, 0.3, 0.1); fx.burst(ev.at, 22, { speed: 4.5, up: 6, colors: ['#8ff6ff', '#58d0c0', '#ffffff'], size: 0.34, life: 0.9, gravity: 6, boost: 1.4 }); }
     else if (ev.type === 'drum') { sound.play('jump'); sound.whoosh(120, 60, 0.35, 0.3, 0.9); fx.burst(ev.at, 24, { speed: 5, up: 6, colors: DUST, size: 0.34, life: 0.8, gravity: 9 }); }
     else if (ev.type === 'survey' && game.state === 'play') { game.survey = true; game.surveyT = 0; game.surveyA = Math.atan2(camera.position.x - player.pos.x, camera.position.z - player.pos.z); sound.play('vista'); sound.play('wings'); sound.whoosh(260, 900, 2.6, 0.12, 0.7); hud.prompt(null); hud.clearHint(); }

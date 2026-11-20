@@ -12,6 +12,8 @@ What still needs adding, changing or fixing. Finished items are deleted, not tic
 
 ## Change
 
+- (asked) Camera: looking up stops when the camera meets the ground, which limits how far up the player can see. Do what most third-person games do: let the camera slide in closer to the painter along the ground as the look goes higher, so the view keeps tilting up.
+- (noted) The Sunken Tower: while the gate is shut, the first stretch of the chain is closed from the sides by a wall that cannot be seen. Something visible there (the light carried along the rails) would be more honest.
 - (noted) The Sunken Tower: from the chain, the nearest mesa reads as a plain leaning cylinder. It wants some shape.
 
 ## Fix
@@ -25,5 +27,6 @@ Built and tested by script and still pictures only; nobody has played these yet.
 - The Sunken Tower: how the slide down the hill feels, and whether the speed is right.
 - The Sunken Tower: the oasis water shimmering and coming apart as it is approached (only ever seen in stills).
 - The Sunken Tower: the chain's blue tiles: the rising chime, the flash, and how the building speed feels.
+- The Sunken Tower: the gate at the chain: whether the line and the picture in the gate are enough to send a player to the palms, how the lit track and the spark at the shoulder look in motion, and the sounds.
 - The Sunken Tower at a low frame rate: staying on the steep sand and on the chain at full push.
 - The desert's new shaders (sand, water) on a slow machine or a phone.

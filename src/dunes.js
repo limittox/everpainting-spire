@@ -4,6 +4,7 @@ import { daub, place, Bag, paintify, glowSprite, clamp, mulberry32 } from './uti
 import { underside, makeStream, SPAN } from './underpainting.js';
 import { ground } from './gallery.js';
 import { DUNE_SUN } from './day.js';
+import { Spark } from './entities.js';
 
 // The Sunken Tower: another picture in the gallery. A desert adrift in the sky, sand going over its edges; statues
 // that the sand has had for a long time; and a great tower, leaning, sunk in it to half its height.
@@ -256,7 +257,7 @@ export class Dunes {
     // of a great dune, and its links are broad enough to walk up. Its blue tiles wake as the painter comes up over them:
     // each one lights, and lends a push that the next one adds to.
     const shines = []; this.tiles = []; this.surge = 0; this.chainF = 2;
-    const glow = (w, d, y, map) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(0, y, 0), new THREE.MeshBasicMaterial({ color: 0x7ff2ff, map, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); m.applyMatrix4(M); scene.add(m); shines.push(m); return m; };
+    const glow = (w, d, y, map) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(0, y, 0), new THREE.MeshBasicMaterial({ color: 0x7ff2ff, map, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); m.applyMatrix4(M); scene.add(m); shines.push(m); return m; };
     const chain = (a, b, walked) => {
       const n = Math.max(1, Math.round(a.distanceTo(b) / 7));
       for (let i = 0; i < n; i++) {
@@ -272,6 +273,7 @@ export class Dunes {
     const ramp = (a, b, hw) => { const ex = b.x - a.x, ez = b.z - a.z, L = Math.hypot(ex, ez); decks.push((x, z) => { const s = ((x - a.x) * ex + (z - a.z) * ez) / L; return s > -0.5 && s < L + 0.5 && Math.abs((z - a.z) * ex - (x - a.x) * ez) / L < hw ? a.y + ((b.y - a.y) * clamp(s, 0, L)) / L : null; }); };
     this.foot = lowAt(FOOT[0], FOOT[1], 0.3); this.head = new V3(START.x, duneH(START.x, START.z) + 0.2, START.z);
     chain(this.foot, this.head, true); ramp(this.foot, this.head, 2.3); posts(this.foot, CH);
+    add(box(2.6, 1.1, 11.8, this.foot.x, this.foot.y + 11.1, this.foot.z, 0, -CH, 0)); add(box(3.0, 0.45, 12.6, this.foot.x, this.foot.y + 11.85, this.foot.z, 0, -CH, 0), GILT);
     for (const [th, len] of [[deg(170), 46], [deg(262), 30], [deg(338), 58]]) {
       const r = rimR(isl, th), o = new V3(Math.cos(th), 0, Math.sin(th)), a = new V3(X0, Y0 - 3, Z0).addScaledVector(o, r - 1.5);
       chain(a.clone().addScaledVector(o, 3).setY(a.y - len), a);
@@ -615,6 +617,36 @@ export class Dunes {
       scene.add(this.mirage);
     }
 
+    // ================================================================================== the gate
+    // The chain is shut off by a gate of light between its two posts, and the light has a picture in it of how it is
+    // opened: a palm, with a ring round its foot. Whoever walks a ring in the sand round the palms (the one thing out
+    // here that is real) finds their track alight behind them, and when the ring is whole a spark is left there, the
+    // same as the ones on the first islands. It goes with whoever takes it; at the gate it goes on ahead, and opens it.
+    {
+      const F = this.foot, c = document.createElement('canvas'); c.width = 384; c.height = 576;
+      const x = c.getContext('2d'), line = (w, col) => { x.lineWidth = w; x.strokeStyle = col; x.lineCap = 'round'; };
+      x.fillStyle = '#000'; x.fillRect(0, 0, 384, 576);
+      line(4, '#3fb4c6'); x.beginPath(); for (let i = -576; i < 960; i += 48) { x.moveTo(i, 0); x.lineTo(i + 576, 576); x.moveTo(i, 0); x.lineTo(i - 576, 576); } x.stroke();
+      x.fillStyle = '#7fe6f2'; for (let j = 0; j <= 576; j += 24) for (let i = (j / 24) % 2 ? 24 : 0; i <= 384; i += 48) { x.beginPath(); x.arc(i, j, 4.5, 0, TAU); x.fill(); }
+      line(10, '#58d0e0'); x.strokeRect(5, 5, 374, 566);
+      // (the picture, in a clear round of its own: trunk, fronds, and the ring)
+      x.fillStyle = '#000'; x.beginPath(); x.arc(192, 300, 150, 0, TAU); x.fill(); line(8, '#58d0e0'); x.beginPath(); x.arc(192, 300, 150, 0, TAU); x.stroke();
+      line(13, '#e2ffff'); x.beginPath(); x.moveTo(190, 368); x.quadraticCurveTo(182, 300, 204, 236); x.stroke();
+      line(10, '#e2ffff'); for (const [ex, ey, bx, by] of [[118, 236, 160, 196], [140, 286, 168, 222], [290, 236, 248, 196], [268, 286, 240, 222], [204, 176, 204, 200]]) { x.beginPath(); x.moveTo(204, 236); x.quadraticCurveTo(bx, by, ex, ey); x.stroke(); }
+      line(11, '#ffffff'); x.beginPath(); x.ellipse(190, 372, 92, 30, 0, 0, TAU); x.stroke();
+      const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace;
+      this.gate = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 10.8), new THREE.MeshBasicMaterial({ map, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+      this.gate.position.set(F.x, F.y + 5.1, F.z); this.gate.rotation.y = Math.PI / 2 - CH;
+      // the track that lights behind the painter, round the palms
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(400 * 3), 3)); g.setDrawRange(0, 0);
+      this.dots = new THREE.Points(g, new THREE.PointsMaterial({ map: world.glowTex, size: 2, color: 0x7ff2ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); this.dots.frustumCulled = false;
+      scene.add(this.gate, this.dots); this.all.push(this.gate, this.dots);
+      this.spark = new Spark(scene, lowAt(MIRAGE[0] - 0.3, MIRAGE[1] - 0.9), world.glowTex); this.spark.hidden = true; this.spark.g.visible = false;
+      this.open = false; this.asked = false;          // is the gate open? has the painter been to it, and been told?
+      this.orb = 0;                                   // the spark: 0 not yet, 1 risen among the palms, 2 with the painter, 3 spent
+      this.sectors = new Uint8Array(24); this.dotN = 0; this.dotAt = new V3(); this.gateK = 1; this.linger = 0;
+    }
+
     // the sky of this picture: a sun that can be seen going down, and then every star there is
     this.sky = new THREE.Group(); this.sky.visible = false;
     {
@@ -676,7 +708,7 @@ export class Dunes {
   /** How fast the air is rising here: only in the evening wind, at the end of the third gallery. */
   thermal(p) { const h = p.y - this.wind.y; return h > -0.6 && h < 26 && (p.x - this.wind.x) ** 2 + (p.z - this.wind.z) ** 2 < 3.8 * 3.8 ? 12 * clamp((25 - h) / 5, 0, 1) : 0; }
   /** Where to go next, for the flecks that drift toward it. */
-  goal() { return this.done ? null : this.below ? this.foot : this.from >= 4 ? this.perch : this.perches[this.from + 1].p; }
+  goal() { return this.done ? null : this.below ? (!this.open && this.orb < 2 && (this.asked || this.orb === 1) ? this.mirageAt : this.foot) : this.from >= 4 ? this.perch : this.perches[this.from + 1].p; }
 
   /** Press the sand down round a point: `r` wide, and how deep (0..1). A little of it is heaped round the edge. */
   dig(x, z, r, depth, tr = this.top) {
@@ -701,8 +733,10 @@ export class Dunes {
     if (!this.contains(p)) return null;
     const h = p.y - Y0, near = (q, r) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < r * r;
     if (this.below) {
+      if (!this.open && this.orb < 2 && near(this.foot, 30)) return { key: 'gate', loud: true, line: 'The way up is shut. It opens for whoever draws a ring round the one thing out here that is real.' };
+      if (this.asked && this.linger > 14) return { key: 'ringround', line: 'Walk all the way round the palms. The sand keeps the ring.' };
       if (near(this.mirageAt, 24)) return { key: 'mirage', line: 'The palms are real. The water was only ever there from up on the hill.' };
-      if (near(this.foot, 34)) return { key: 'chain', line: 'This chain still holds. Its links are broad enough to walk up.' };
+      if (this.open && near(this.foot, 34)) return { key: 'chain', line: 'This chain still holds. Its links are broad enough to walk up.' };
       if (near(this.isl, 230)) return { key: 'chains', line: 'Chains held it to the desert once. Most have parted: one still comes down to the sand, on the top of the great dune.' };
       if (p.z > Z0 + ENTER[1] - 30) return { key: 'adrift', line: 'There: a desert of its own, adrift over this one. And a long way down to it.' };
       return { key: 'vast', line: 'Sand this steep is not for walking. Go with it.' };
@@ -719,13 +753,13 @@ export class Dunes {
 
   /** The look-out is over: the picture is finished. */
   surveyed() { this.done = true; }
-  save() { return { done: this.done ? 1 : 0 }; }
-  load(d) { this.done = !!(d && d.done); }
+  save() { return { done: this.done ? 1 : 0, open: this.open ? 1 : 0, asked: this.asked ? 1 : 0 }; }
+  load(d) { this.done = !!(d && d.done); this.open = !!(d && (d.open || d.done)); this.asked = !!(d && d.asked); }          // (a journey saved before there was a gate, and already past it, finds it open)
 
   update(dt, t, player, camera) {
     const ev = this.events.splice(0), here = !!player && this.contains(player.pos);
     this.sky.visible = this.gust.visible = this.mirage.visible = here; for (const b of this.birds) b.g.visible = here; for (const m of this.all) m.visible = here;
-    if (!here) { this.was = false; this.sandy = false; this.lit.visible = false; return ev; }
+    if (!here) { this.was = false; this.sandy = false; this.lit.visible = false; this.spark.g.visible = false; return ev; }
     const p = player.pos, h = p.y - Y0, sand = duneH(p.x, p.z), onSand = player.grounded && Math.abs(p.y - sand) < 0.4;
     const under = desertH(p.x, p.z), tr = onSand ? this.top : player.grounded && Math.abs(p.y - under) < 0.4 ? this.low : null, landed = player.grounded && !this.wasGround;
     if (player.grounded) this.sandy = tr === this.low;          // (loose sand underfoot, or last underfoot: the painter slides on it)
@@ -733,6 +767,7 @@ export class Dunes {
     // (stepping in: it is noon again, whatever hour it was left at; and nothing has crossed the sand down here)
     if (!this.was) {
       this.was = true; this.far = 0; this.day = 0; this.from = 0; this.glid = false; this.up = false; this.wasGround = true; this.surge = 0; this.chainF = 2; for (const q of this.tiles) q.lit = false;
+      if (!this.open) { this.orb = 0; this.sectors.fill(0); this.dotN = 0; this.spark.hidden = true; } this.gateK = this.open ? 0 : 1; this.linger = 0;
       const m = this.low; m.c.fillStyle = GREY; m.c.fillRect(0, 0, 1024, 1024); m.x0 = p.x - m.size / 2; m.z0 = p.z - m.size / 2; m.dirty = true;
     }
     // ---- the open desert has an end, though not one that can be seen: the painter is turned back there
@@ -777,6 +812,43 @@ export class Dunes {
       this.surge *= Math.exp(-(on ? 0.6 : 3) * dt); if (this.surge > 0.5) player.rush = Math.max(player.rush, this.surge);          // shortcut: capped at 15 so a slow frame's step still fits the painter's step-up; raise both together
     }
 
+    // ---- the gate at the foot of the chain; the ring round the palms that leaves a spark; and the spark, which opens it
+    {
+      const a = this.foot, b = this.head, ex = b.x - a.x, ez = b.z - a.z, L = Math.hypot(ex, ez), ux = ex / L, uz = ez / L;
+      const s = (p.x - a.x) * ux + (p.z - a.z) * uz, lat = (p.z - a.z) * ux - (p.x - a.x) * uz, sp = this.spark;
+      if (this.open && this.orb !== 3) { this.orb = 3; sp.hidden = true; }
+      // (shut, the first of the chain cannot be stood on or jumped onto: the painter is put back in front of it, or off to the side)
+      if (!this.open && s > -0.6 && s < 16 && Math.abs(lat) < 3.5 && p.y > a.y + ((b.y - a.y) * s) / L - 1.5) {
+        if (s + 0.6 <= 3.5 - Math.abs(lat)) { p.x -= ux * (s + 0.6); p.z -= uz * (s + 0.6); } else { const k = Math.sign(lat || 1) * 3.5 - lat; p.x -= uz * k; p.z += ux * k; }
+      }
+      if (!this.open && Math.hypot(p.x - a.x, p.z - a.z) < 30) this.asked = true;
+      const C = this.mirageAt, dx = p.x - C.x, dz = p.z - C.z, d = Math.hypot(dx, dz), pos = this.dots.geometry.attributes.position;
+      this.linger = this.orb === 0 && d < 44 ? this.linger + dt : 0;
+      if (this.orb === 0) {
+        if (d > 44) { this.sectors.fill(0); this.dotN = 0; }          // (walked away: the sand lets go of it)
+        else if (d > 3.5 && d < 36 && tr === this.low) {
+          // the round of the palms is in 24 parts; being in one counts it and the one either side, so that a quick step does not leave a gap
+          const i = Math.floor(((Math.atan2(dz, dx) + Math.PI) / TAU) * 24) % 24; this.sectors[i] = this.sectors[(i + 1) % 24] = this.sectors[(i + 23) % 24] = 1;
+          if (this.dotN < 400 && (!this.dotN || this.dotAt.distanceToSquared(p) > 1.7)) { pos.setXYZ(this.dotN++, p.x, p.y + 0.3, p.z); pos.needsUpdate = true; this.dotAt.copy(p); }
+          if (this.sectors.every((v) => v)) { this.orb = 1; sp.hidden = false; sp.locked = false; sp.k = 0; ev.push({ type: 'ring', at: sp.g.position }); }
+        }
+      }
+      if (this.orb === 1 && sp.k > 0.75 && Math.hypot(p.x - sp.g.position.x, p.z - sp.g.position.z) < 3 && Math.abs(p.y - sp.g.position.y) < 5) { this.orb = 2; ev.push({ type: 'orb', at: sp.g.position }); }
+      if (this.orb === 2) {
+        // it rides at the painter's shoulder; near the gate it goes on ahead, into the light
+        const near = Math.hypot(p.x - a.x, p.z - a.z) < 18, g = sp.g.position, hd = player.heading, k = 1 - Math.exp(-(near ? 2.5 : 6) * dt);
+        g.x += ((near ? a.x : p.x - Math.sin(hd) * 1.1 + Math.cos(hd) * 0.9) - g.x) * k; g.z += ((near ? a.z : p.z - Math.cos(hd) * 1.1 - Math.sin(hd) * 0.9) - g.z) * k; sp.base += ((near ? a.y + 3.4 : p.y + 2.4) - sp.base) * (near ? k : 1 - Math.exp(-12 * dt));
+        if (near && Math.hypot(g.x - a.x, g.z - a.z) < 0.6) { this.orb = 3; this.open = true; sp.hidden = true; ev.push({ type: 'gate', at: this.gate.position }); }
+      }
+      sp.update(t, dt); if (this.orb === 2) { sp.beam.visible = false; sp.g.scale.setScalar(0.55); }
+      // the track is brightest while the spark waits, and goes out once it is taken; the gate's light goes out when it opens
+      const m = this.dots.material; m.opacity += ((this.orb === 0 ? 0.8 : this.orb === 1 ? 1 : 0) - m.opacity) * (1 - Math.exp(-2 * dt)); m.size = this.orb === 1 ? 2.7 + 0.4 * Math.sin(t * 4) : 2;
+      if (this.orb > 1 && m.opacity < 0.02) this.dotN = 0;
+      this.dots.geometry.setDrawRange(0, this.dotN);
+      this.gateK += ((this.open ? 0 : 1) - this.gateK) * (1 - Math.exp(-1.6 * dt));
+      this.gate.visible = this.gateK > 0.02; this.gate.material.opacity = this.gateK * (0.8 + 0.15 * Math.sin(t * 2.2));
+    }
+
     // ---- the sand takes the mark of what crosses it
     if (tr) {
       const fast = player.surfing;
@@ -812,7 +884,7 @@ export class Dunes {
     }
     // (the island is such a place too: whoever falls from it to the desert below is carried back to the head of the chain)
     if (player.grounded && !player.lift) {
-      if (h > -6) this.up = true;
+      if (h > -6) this.up = this.open = true;          // (whoever stands on the island has no more use for the gate, however they came)
       else if (this.below) { if (this.up && landed && this.fall > 26 && !glided && !this.done) { player.safe.copy(this.head); player.floatBack(); ev.push({ type: 'back' }); } else this.up = false; }
     }
     // the drum throws up whoever lands on it
