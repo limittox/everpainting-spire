@@ -259,6 +259,16 @@ export class Gallery {
         for (const inAt of [tubes.frameAt, sAt]) this.doors.push({ at: inAt, text: 'Step back into the Gallery', to: back, toast: ['The Gallery', ''], out: true });
         this.sAt = sAt;
       }
+      // a picture hung after the others were: a frame here that leads into it, and frames inside it that lead back
+      this.dunes = null;
+      this.hang = (lvl) => {
+        const at = hp(Math.PI * 0.3, 15.5), back = arrive(at, centre(HALL), hall, flat(HALL)), f0 = lvl.frames[0];
+        stand(lit(frame(W, H, picture(...lvl.picture), lvl.title), H), at, centre(HALL));
+        for (const f of lvl.frames) stand(lit(frame(W, H, pic.hall, 'The Gallery'), H), f.at, f.face);
+        this.doors.push({ at, text: 'Step into ' + lvl.title, to: arrive(f0.at, f0.face, lvl.isl, (x, z) => world.groundHeight(x, z, 1e9)), toast: lvl.toast });
+        for (const f of lvl.frames) this.doors.push({ at: f.at, text: 'Step back into the Gallery', to: back, toast: ['The Gallery', ''], out: true });
+        lvl.frameAt = at; this.dunes = lvl;
+      };
 
       // two more are still under their dust sheets, and the biggest frame of all is empty
       const sheet = (at) => place(new THREE.BoxGeometry(W + 1.1, H + 0.9, 0.8, 6, 6, 1), at.x, at.y + 0.5 + H / 2 + 0.1, at.z, 0, Math.atan2(HALL.x - at.x, HALL.z - at.z), 0);
@@ -613,23 +623,25 @@ export class Gallery {
 
   /** Is this point in the gallery or one of its pictures? (They lie far to the east of everything else.) */
   contains(p) { return p.x > 3000; }
-  where(p) { return p.x < 3000 ? null : p.x < 5000 ? 'hall' : 'tubes'; }
+  where(p) { return p.x < 3000 ? null : p.x < 5000 ? 'hall' : p.x < 10000 ? 'tubes' : 'dunes'; }
   /** On the Piper's field, at the far end of the picture. */
   onField(p) { return p.x > 7000 && (p.x - SUMMER.x) ** 2 + (p.z - SUMMER.z) ** 2 < 34 * 34 && Math.abs(p.y - SUMMER.y) < 12; }
-  /** The picture has every colour it wanted. */
-  get done() { return this.tubes.done; }
+  /** Every picture that is hung is finished. */
+  get done() { return this.tubes.done && (!this.dunes || this.dunes.done); }
 
   /** The sky and light for where the camera is: which look, and how far along it. */
   look(p) {
     const w = this.where(p);
-    return !w ? null : w === 'hall' ? { name: 'hall', at: this.greyK } : { name: 'tubes', at: this.tubes.eve };
+    return !w ? null : w === 'hall' ? { name: 'hall', at: this.greyK } : w === 'dunes' ? { name: 'dunes', at: this.dunes.day } : { name: 'tubes', at: this.tubes.eve };
   }
 
   /** Where the next thing to do is, for the flecks that drift toward it: the frame of the picture, or the next thing to mix in it. */
   goal(p) {
     const w = this.where(p);
-    if (!w || this.done || this.grey || this.ended) return null;
-    return w === 'hall' ? this.hung[0].at : this.tubes.goal();
+    if (!w || this.slipped || this.grey || this.ended) return null;
+    if (w === 'dunes') return this.dunes.goal();
+    if (w === 'tubes') return this.tubes.done ? null : this.tubes.goal();
+    return !this.tubes.done ? this.hung[0].at : this.dunes && !this.dunes.done ? this.dunes.frameAt : null;
   }
 
   /** What E would do for a painter standing at `p`, if anything: step through a frame. */
@@ -701,7 +713,7 @@ export class Gallery {
     return null;
   }
 
-  save() { return { tubes: this.tubes.save(), slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, joined: this.joined ? 1 : 0, unpainted: this.unpainted, undone: this.undone ? 1 : 0, after: Math.min(this.after, 9), crawled: this.crawled ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
+  save() { return { tubes: this.tubes.save(), dunes: this.dunes ? this.dunes.save() : null, slipped: this.slipped ? 1 : 0, grey: this.grey ? 1 : 0, joined: this.joined ? 1 : 0, unpainted: this.unpainted, undone: this.undone ? 1 : 0, after: Math.min(this.after, 9), crawled: this.crawled ? 1 : 0, taken: this.taken, whole: this.whole ? 1 : 0, ended: this.ended ? 1 : 0, lifts: Math.min(this.lifts, 99), visits: Math.min(this.visits, 9) }; }
   load(d) {
     if (!d) return;
     this.slipped = !!d.slipped; this.ended = this.slipped && !!d.ended; this.grey = this.slipped && !!d.grey && !this.ended;
@@ -716,6 +728,7 @@ export class Gallery {
     this.lifts = Number.isInteger(d.lifts) && d.lifts > 0 ? d.lifts : 0; this.visits = Number.isInteger(d.visits) && d.visits > 0 ? d.visits : 0;
     // (a journey saved when this level was something else, and which had got as far as the dust sheet: the picture counts as finished)
     this.tubes.load(d.tubes, this.slipped);
+    if (this.dunes) this.dunes.load(d.dunes);
   }
 
   update(dt, t, player, blots = null) {

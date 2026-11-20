@@ -95,6 +95,8 @@ const GREY = { ...ROOM,
   cream: rgb(0.66, 0.66, 0.67), rose: rgb(0.50, 0.50, 0.52), violet: rgb(0.36, 0.36, 0.38), blue: rgb(0.40, 0.40, 0.42),
   sunCol: rgb(0.7, 0.7, 0.72), fog: hex(0x77777c), hemiSky: hex(0xc8c8d0), hemiGround: hex(0x55555c), hemiI: 1.0,
   sun: hex(0xd0d0d8), sunI: 0.8, far: hex(0x7c7c82), cloud: hex(0x4a4a50), tint: hex(0xe8e8f0) };
+/** Where the sun stands over the desert, by the hour there (0 noon .. 1 night). The picture draws its sun by this too. */
+export const DUNE_SUN = [[0, dir(0.2, 0.9, -0.4)], [0.45, dir(-0.45, 0.5, -0.72)], [0.72, dir(-0.7, 0.07, -0.7)], [1, dir(-0.7, -0.16, -0.7)]];
 const LOOKS = {
   paper: PAPERS,
   grey: [{ t: 0, ...GREY }, { t: 1, ...GREY }],
@@ -116,6 +118,30 @@ const LOOKS = {
       fog: hex(0x4c3c9c), hemiSky: hex(0xa8a0ff), hemiGround: hex(0x7048ac), hemiI: 1.14,
       sun: hex(0xd0ccff), sunI: 1.05, sunPos: dir(-0.4, 0.8, -0.5),
       far: hex(0x7468c0), cloud: hex(0x3a3074), sea: hex(0x8a80e0), tint: hex(0xf2f0ff) },
+  ],
+  // The Sunken Tower: a whole day. A white sun overhead; gold; the sun going down red behind the tower; and night,
+  // when the moon is not seen but its light lies low across the dunes.
+  dunes: [
+    { ...KEYS[1], t: DUNE_SUN[0][0], sunDir: DUNE_SUN[0][1],
+      top: rgb(0.14, 0.42, 0.92), mid: rgb(0.46, 0.68, 0.97), hor: rgb(0.98, 0.91, 0.76), low: rgb(0.94, 0.82, 0.62),
+      cream: rgb(1.0, 0.98, 0.93), rose: rgb(0.99, 0.90, 0.80), violet: rgb(0.70, 0.74, 0.94), blue: rgb(0.40, 0.60, 0.95),
+      sunCol: rgb(1.3, 1.22, 0.98), fog: hex(0xecdcb8), hemiSky: hex(0xfff6e6), hemiGround: hex(0xdcae70), hemiI: 1.62,
+      sun: hex(0xfffbea), sunI: 2.5, sunPos: dir(0.25, 1.0, 0.2), far: hex(0xf6e8c8), cloud: hex(0x9a8a70), tint: hex(0xfffaf0) },
+    { ...KEYS[2], t: DUNE_SUN[1][0], sunDir: DUNE_SUN[1][1],
+      top: rgb(0.20, 0.42, 0.90), mid: rgb(0.62, 0.72, 0.92), hor: rgb(1.0, 0.84, 0.58), low: rgb(0.97, 0.74, 0.52),
+      cream: rgb(1.0, 0.94, 0.80), rose: rgb(1.0, 0.80, 0.66), violet: rgb(0.66, 0.62, 0.86), blue: rgb(0.36, 0.52, 0.92),
+      sunCol: rgb(1.6, 1.0, 0.5), fog: hex(0xf0c090), hemiSky: hex(0xffe6cc), hemiGround: hex(0xd09060), hemiI: 1.45,
+      sun: hex(0xffcc8a), sunI: 2.4, sunPos: dir(-0.5, 0.62, -0.5), far: hex(0xf8d4a8), tint: hex(0xfff8ec) },
+    { ...KEYS[3], t: DUNE_SUN[2][0], sunDir: DUNE_SUN[2][1],
+      top: rgb(0.10, 0.11, 0.44), mid: rgb(0.48, 0.25, 0.60), hor: rgb(1.0, 0.50, 0.28), low: rgb(0.86, 0.36, 0.38),
+      cream: rgb(1.0, 0.70, 0.56), rose: rgb(0.94, 0.42, 0.50), sunCol: rgb(1.9, 0.8, 0.38), stars: 0.3,
+      fog: hex(0xb86a74), hemiSky: hex(0xd0a8e0), hemiGround: hex(0xb46a58), hemiI: 1.25,
+      sun: hex(0xff8a54), sunI: 1.8, sunPos: dir(-0.75, 0.24, -0.6), far: hex(0xc88a98), tint: hex(0xfff2f0) },
+    { ...KEYS[4], t: DUNE_SUN[3][0], sunDir: DUNE_SUN[3][1],
+      top: rgb(0.02, 0.03, 0.15), mid: rgb(0.05, 0.08, 0.29), hor: rgb(0.25, 0.20, 0.46), low: rgb(0.15, 0.13, 0.33),
+      cream: rgb(0.50, 0.48, 0.78), rose: rgb(0.40, 0.32, 0.64), violet: rgb(0.16, 0.15, 0.42), blue: rgb(0.07, 0.09, 0.32),
+      sunCol: rgb(0.6, 0.32, 0.5), stars: 1, fog: hex(0x2c2e66), hemiSky: hex(0x6878dc), hemiGround: hex(0x3a3468), hemiI: 0.8,
+      sun: hex(0xc8d6ff), sunI: 1.35, sunPos: dir(0.55, 0.42, 0.45), far: hex(0x4a4c92), cloud: hex(0x2a2c5c), tint: hex(0xeef2ff) },
   ],
 };
 

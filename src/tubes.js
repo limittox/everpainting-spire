@@ -586,7 +586,7 @@ export class Tubes {
   }
 
   /** Is this point inside the picture? (It lies far to the east, beyond the gallery.) */
-  contains(p) { return p.x > 7000; }
+  contains(p) { return p.x > 7000 && p.x < 10000; }
   get done() { return this.arrived; }
   /** How far along the picture is, 0..3: for the copy of it that hangs in the hall, and for the music. */
   get made() { return this.arrived ? 3 : Math.min(2, this.sketches.filter((s) => s.once).length >> 1); }

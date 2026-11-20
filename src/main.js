@@ -21,6 +21,7 @@ import { Seedbed } from './seedbed.js';
 import { LastPage } from './lastpage.js';
 import { Gallery } from './gallery.js';
 import { Tubes, TUBES } from './tubes.js';
+import { Dunes, DUST } from './dunes.js';
 import { setupTouch } from './touch.js';
 import { clamp, lerp, glowTexture } from './util.js';
 
@@ -50,7 +51,8 @@ const under = new Underpainting(scene, world, uTime, interior.center);
 const seedbed = new Seedbed(scene, world, uTime, under);
 const lastpage = new LastPage(scene, world, uTime, under, seedbed);          // the end of it: old paint to wipe away, four wells, and sunrise          // onward from the Dry Stair: vines, warm air, the Kiln
 const tubes = new Tubes(scene, world, uTime, seedbed);                           // the picture in it that can be stepped into: three tubes of paint, and mixing
-const gallery = new Gallery(scene, world, uTime, lastpage, interior.center, tubes);                   // the third level: a gallery, and pictures to step into
+const gallery = new Gallery(scene, world, uTime, lastpage, interior.center, tubes);
+const dunes = new Dunes(scene, world, uTime); gallery.hang(dunes);                                     // another picture in it: a desert, and a tower to climb                   // the third level: a gallery, and pictures to step into
 const busy = [world.spawn, world.gate, ...world.sparkSpots, ...world.blotSpots.map((b) => b.p), ...world.dropSpots, ...world.bridges.map((b) => b.anchor)];
 const vistas = new Vistas(scene, world, renderer, [...busy, ...secrets.avoid], post);
 interior.hang(vistas.spots);
@@ -299,7 +301,7 @@ function fillBook() {
   const have = palette();
   row('Paints', (v) => { for (const [i, p] of PAINTS.entries()) { const d = add('i', have.includes(i) ? 'dot' : 'dot none'); if (have.includes(i)) d.style.background = p.hex; d.title = have.includes(i) ? p.name : ''; v.appendChild(d); } });
   row('The Spire', (v) => names(v, [['The last stroke', game.won], ['The atelier', !!game.hints.atelier], ['The crow\u2019s nest', !!game.hints.nest], ['The great brush', !!game.reach]]));
-  if (game.hints.hung) row('Varnishing Day', (v) => names(v, [['Three Tubes', tubes.done]]));
+  if (game.hints.hung) row('Varnishing Day', (v) => names(v, [['Three Tubes', tubes.done], ['The Sunken Tower', dunes.done]]));
   if (game.hints.under) row('The Underpainting', (v) => names(v, [['The Dry Stair', under.done], ['The Seedbed', seedbed.grown], ['The Kiln', seedbed.lit], ['The Overpainted Place', lastpage.cleared], ['The Blank Page', lastpage.done]]));
   const mins = Math.max(1, Math.round(game.playT / 60));
   row('Wandering', (v) => v.appendChild(add('span', '', `${mins} minute${mins === 1 ? '' : 's'}${game.journey > 1 ? `, on your ${nth(game.journey)} journey` : ''}`)));
@@ -641,6 +643,14 @@ function updateCamera(dt, snap = false) {
     tmp.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).multiplyScalar(far).add(tubes.scope.eye);
     camera.lookAt(tmp2.copy(camTarget).lerp(tmp, e));
   }
+  // looking out from the top of the tower: the eye goes once round the painter, drawing back and rising as it goes
+  game.surveyK = clamp((game.surveyK || 0) + (game.survey ? dt / 2.4 : -dt / 1.8), 0, 1);
+  if (game.surveyK > 0) {
+    const e = game.surveyK * game.surveyK * (3 - 2 * game.surveyK), a = game.surveyA + game.surveyT * 0.5, far = 13 + game.surveyT * 1.9, p = player.pos;
+    camera.fov += (66 - camera.fov) * e; camera.updateProjectionMatrix();
+    camera.position.lerp(tmp.set(p.x + Math.sin(a) * far, p.y + 3 + game.surveyT * 0.95, p.z + Math.cos(a) * far), e);
+    camera.lookAt(tmp2.copy(camTarget).lerp(tmp.set(p.x, p.y + 1 - game.surveyT * 0.35, p.z), e));          // (looking down more as it goes: at the painter, and then at everything under them)
+  }
 }
 
 const UP = new V3(0, 1, 0);
@@ -781,6 +791,7 @@ function doSwing() {
     if (ev.day) { hud.hint('The lantern is a drawing again, and the evening is going out with it.', 8000, true); sound.pluck(true); }
     saveSoon();
   }
+  dunes.strike(sx, sz, player.pos);          // (in the desert the brush leaves its mark in the sand as well)
   for (const ev of gallery.strike(sx, sz, player.pos, hex)) {
     fx.burst(ev.at, 46, { speed: 5, up: 6, colors: ['#fff4dc', '#ffffff', '#f1ece2'], size: 0.4, life: 1.3, gravity: 5 });
     sound.play('paint'); sound.pluck(true);
@@ -960,6 +971,20 @@ function reachNest() {
   hint('nest', 'Hold Space in the air to glide back down &nbsp;·&nbsp; or see where the wind goes.', 8500);
 }
 
+// ---------------------------------------------------------------- looking out from the top of the sunken tower
+function updateSurvey(dt, t) {
+  game.surveyT += dt;
+  player.update(dt, t, IDLE, view.yaw, world);
+  for (const b of blots) b.update(dt, t, player);
+  hud.prompt(null);
+  // (once round, and then it is over; or sooner, for whoever has seen it)
+  if (game.surveyT > 13.5 || (game.surveyT > 3 && ['KeyE', 'Space', 'Enter', 'Attack'].some((k) => pressed.has(k)))) {
+    game.survey = false; game.lookIdle = 0;
+    if (!dunes.done) { dunes.surveyed(); hud.toast('The Sunken Tower', 'From noon to night', 5200); saveSoon(); }
+  }
+  updateCamera(dt);
+}
+
 // ---------------------------------------------------------------- looking through the telescope
 /** Turn the telescope: slower, the closer it is looking. */
 function scopeLook(dx, dy) {
@@ -1047,6 +1072,7 @@ function updatePlay(dt, t) {
   game.playT += dt;
   if (game.rest) { updateRest(dt, t); return; }
   if (game.scope) { updateScope(dt, t); return; }
+  if (game.survey) { updateSurvey(dt, t); return; }
   if (gallery.ending) { updateEnding(dt, t); return; }
   const input = {
     mx: (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0),
@@ -1064,7 +1090,7 @@ function updatePlay(dt, t) {
   if (pressed.has('KeyQ') || pressed.has('NextPaint')) setPaint(paints[(paints.indexOf(game.paint) + 1) % paints.length]);
   paints.forEach((p, k) => { if (k < 10 && pressed.has('Digit' + ((k + 1) % 10))) setPaint(p); });
 
-  player.updraft = under.contains(player.pos) ? seedbed.thermal(player.pos) : tubes.thermal(player.pos);
+  player.updraft = under.contains(player.pos) ? seedbed.thermal(player.pos) : dunes.contains(player.pos) ? dunes.thermal(player.pos) : tubes.thermal(player.pos);
   if (player.updraft > 0 && player.gliding) hint('rising', 'Keep Space held to rise with the warm air, then glide.', 6500);
   const events = player.update(dt, t, input, view.yaw, world);
   const pale = under.contains(player.pos);
@@ -1081,12 +1107,13 @@ function updatePlay(dt, t) {
     }
     if (player.lift) fx.burst(tmp.copy(player.pos).setY(player.pos.y + 0.6), 3, { speed: 2, up: 3, colors: ['#fff6d0', '#ffe2a0', '#ffffff'], size: 0.3, life: 0.8, gravity: -1, boost: 1.4 });
   }
+  const dusty = dunes.contains(player.pos) ? DUST : PATH_COLORS;          // (what the feet throw up: paint, or in the desert sand)
   for (const e of events) {
     if (e === 'jump') sound.play('jump');
     if (e === 'jump' || e === 'doublejump') for (const b of blots) b.hop(0.12 + b.slot * 0.08);
     if (e === 'doublejump') { sound.play('jump'); fx.burst(player.pos, 16, { speed: 4, up: 1, size: 0.3, life: 0.5, colors: SOFT }); }
-    if (e === 'land') { sound.play('land'); fx.burst(player.pos, 8, { speed: 3, up: 2, colors: PATH_COLORS, size: 0.25, life: 0.4 }); }
-    if (e === 'step') { sound.play('step'); fx.burst(player.pos, 2, { speed: 1.1, up: 1.3, colors: PATH_COLORS, size: 0.17, life: 0.32, spread: 0.1 }); }
+    if (e === 'land') { sound.play('land'); fx.burst(player.pos, 8, { speed: 3, up: 2, colors: dusty, size: 0.25, life: 0.4 }); }
+    if (e === 'step') { sound.play('step'); fx.burst(player.pos, 2, { speed: 1.1, up: 1.3, colors: dusty, size: 0.17, life: 0.32, spread: 0.1 }); }
     if (e === 'glide') sound.play('glide');
     if (e === 'wind') { sound.play('wind'); hint('wind', 'The wind carries you. Press Space to let go.'); }
     if (e === 'settle') fx.burst(player.pos, 20, { speed: 3, up: 3, colors: SOFT, size: 0.3, life: 0.8 });
@@ -1097,7 +1124,7 @@ function updatePlay(dt, t) {
   sound.setLevel(game.won ? 5 : (world.bridges[0].progress >= 1 ? 1 : 0) + game.sparks, game.friends);
 
   // trails of colour while flowing
-  if (player.surfing) fx.burst(player.pos, 2, { speed: 2.2, up: 2.4, colors: PATH_COLORS, size: 0.36, life: 0.7, gravity: 8 });
+  if (player.surfing) fx.burst(player.pos, 2, { speed: 2.2, up: 2.4, colors: dusty, size: 0.36, life: 0.7, gravity: 8 });
   if (player.ride || player.lift) fx.burst(tmp.copy(player.pos).setY(player.pos.y + 0.9), 2, { speed: 1.6, up: 0.6, colors: SOFT, size: 0.3, life: 0.9, gravity: 1 });
 
   // falling is not failing: below everything nearby, the paint simply carries you back
@@ -1216,7 +1243,7 @@ function updatePlay(dt, t) {
   }
   const hung = gallery.where(player.pos);
   // (somebody in a picture speaking gets their name over the line, in a panel that cannot be missed)
-  if (hung) { const thing = gallery.waiting(player.pos) || tubes.waiting(player.pos); if (thing) { if (thing.again) delete game.hints[thing.key]; hint(thing.key, (thing.who ? '<b class="who">' + thing.who + '</b>' : '') + thing.line, thing.who || thing.loud ? 11000 : 8500, !!thing.who || !!thing.loud); } }
+  if (hung) { const thing = gallery.waiting(player.pos) || tubes.waiting(player.pos) || dunes.waiting(player.pos); if (thing) { if (thing.again) delete game.hints[thing.key]; hint(thing.key, (thing.who ? '<b class="who">' + thing.who + '</b>' : '') + thing.line, thing.who || thing.loud ? 11000 : 8500, !!thing.who || !!thing.loud); } }
   // --- an easel and a stool: somewhere to sit
   if (!prompt && player.grounded) {
     const v = vistas.near(player.pos);
@@ -1245,7 +1272,7 @@ function updatePlay(dt, t) {
   } else if (world.bridges[3].progress < 1) { goal = world.bridges[3].anchor; objective = 'Lay the last bridge to the Spire'; }
   else { goal = world.gate; objective = 'Step up to the glowing gate'; }
   if (pale) { goal = null; objective = !under.done ? 'Bring the Dry Stair its water' : !seedbed.grown ? 'Grow the way on' : !seedbed.lit ? 'Cross to the Kiln on warm air' : !lastpage.cleared ? 'Ride the Kiln\u2019s warm air north' : !lastpage.done ? 'Fill the four wells' : 'It is morning'; }      // nothing in the first level to point at from here
-  if (hung) { goal = gallery.goal(player.pos); objective = gallery.grey || gallery.ended ? '' : gallery.done && gallery.slipped ? 'One of the dust sheets has come off' : gallery.done ? 'Two pictures are finished. The others are not hung yet' : 'Mix what the picture is missing'; }
+  if (hung) { goal = gallery.goal(player.pos); objective = gallery.grey || gallery.ended ? '' : gallery.slipped ? 'One of the dust sheets has come off' : hung === 'dunes' ? (dunes.done ? 'The picture is finished' : 'Climb the sunken tower') : hung === 'tubes' ? (tubes.done ? 'The picture is finished' : 'Mix what the picture is missing') : 'Two pictures are hung. Finish them both'; }
   hud.objective(objective);
   game.guideT -= dt;
   if (goal && game.guideT <= 0 && !player.ride && !player.lift) {
@@ -1395,6 +1422,13 @@ function tick(dt) {
     else if (ev.type === 'firework') { const k = clamp(1 - ev.d / 240, 0, 1) ** 2; if (k > 0.01) { sound.whoosh(170, 55, 0.5, 0.22 * k, 0.8); sound.whoosh(2600, 5200, 0.7, 0.05 * k, 0.6); } }
     else if (ev.type === 'spring') { sound.play('jump'); sound.pluck(true); fx.burst(ev.at, 30, { speed: 6, up: 7, colors: [ev.hex, ev.hex, '#ffffff'], size: 0.4, life: 0.9, gravity: 9 }); }
   }
+  for (const ev of dunes.update(dt, time, game.state === 'title' ? null : player, camera)) {
+    if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
+    else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
+    else if (ev.type === 'back') sound.play('wind');
+    else if (ev.type === 'drum') { sound.play('jump'); sound.whoosh(120, 60, 0.35, 0.3, 0.9); fx.burst(ev.at, 24, { speed: 5, up: 6, colors: DUST, size: 0.34, life: 0.8, gravity: 9 }); }
+    else if (ev.type === 'survey' && game.state === 'play') { game.survey = true; game.surveyT = 0; game.surveyA = Math.atan2(camera.position.x - player.pos.x, camera.position.z - player.pos.z); sound.play('vista'); sound.play('wings'); sound.whoosh(260, 900, 2.6, 0.12, 0.7); hud.prompt(null); hud.clearHint(); }
+  }
   gallery.outdoors = game.state === 'play' && !gallery.contains(player.pos) && !under.contains(player.pos) && !interior.inside(player.pos);
   game.jolt = Math.max(0, (game.jolt || 0) - dt * 2.4);
   camera.getWorldDirection(tmp); gallery.gaze.set(tmp.x, 0, tmp.z).normalize();
@@ -1530,4 +1564,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // small debug handle for the console
-window.__game = { game, player, world, post, camera, secrets, interior, sketches, pieces, sights, under, seedbed, lastpage, gallery, tubes, galleryAct, enterUnder, leaveUnder, photo, mouse, openPhoto, closePhoto, fillBook, secondJourney, findSecret, enterSpire, leaveSpire, reachNest, blots, sparks, keys, pressed, garden, sound, painter, vistas, day, settings, store, saveGame, snapshot, openMenu, closeMenu, begin, doSwing, openGallery, sitDown, standUp, step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); draw(); }, tp(i) { const isl = world.islands[i]; const p = new V3(isl.x, 0, isl.z + isl.r * 0.5); p.y = world.groundHeight(p.x, p.z, 1e9); player.teleport(p); } };
+window.__game = { game, player, world, post, camera, secrets, interior, sketches, pieces, sights, under, seedbed, lastpage, gallery, tubes, dunes, galleryAct, enterUnder, leaveUnder, photo, mouse, openPhoto, closePhoto, fillBook, secondJourney, findSecret, enterSpire, leaveSpire, reachNest, blots, sparks, keys, pressed, garden, sound, painter, vistas, day, settings, store, saveGame, snapshot, openMenu, closeMenu, begin, doSwing, openGallery, sitDown, standUp, step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); draw(); }, tp(i) { const isl = world.islands[i]; const p = new V3(isl.x, 0, isl.z + isl.r * 0.5); p.y = world.groundHeight(p.x, p.z, 1e9); player.teleport(p); } };

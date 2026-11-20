@@ -175,7 +175,8 @@ export class Garden {
     const key = cellKey(x, z);
     if (this.cells.has(key)) return false;
     const w = this.world;
-    if (!w.islandAt(x, z)) return false;
+    const isl = w.islandAt(x, z);
+    if (!isl || isl.bare) return false;          // (nothing comes up in sand)
     const y = w.groundHeight(x, z, yRef + 1.5);
     if (!(y > -Infinity) || Math.abs(y - yRef) > 1.6) return false;
     for (const c of w.colliders) if ((c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + 0.25) ** 2) return false;

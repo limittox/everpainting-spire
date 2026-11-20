@@ -17,6 +17,7 @@ export function rimR(isl, th) {
   return isl.r * (1 + 0.1 * Math.sin(3 * th + isl.ph) + 0.05 * Math.sin(7 * th + isl.ph * 2.3));
 }
 export function surfY(isl, x, z) {
+  if (isl.surf) return isl.surf(x, z);          // (ground with a shape of its own: the dunes)
   return isl.y + 0.45 * Math.sin(x * 0.21 + isl.ph) * Math.cos(z * 0.19 + isl.ph * 1.7);
 }
 function edgePoint(isl, tx, tz, inset, lift = 0.22) {
