@@ -1455,6 +1455,7 @@ function tick(dt) {
     if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
     else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
     else if (ev.type === 'back') sound.play('wind');
+    else if (ev.type === 'fling') { sound.whoosh(300, 2600, 1.3, 0.2, 0.7); sound.play('wings'); sound.pluck(true); fx.burst(ev.at, 50, { speed: 8, up: 6, colors: ['#fff6d0', '#ffd060', '#ffffff'], size: 0.45, life: 1.3, gravity: 4, boost: 1.5 }); }
     else if (ev.type === 'stir') { sound.whoosh(80, 38, 3.6, 0.3, 0.7); sound.bell(55, sound.ctx ? sound.ctx.currentTime + 1.2 : 0, 0.12, 5); }
     else if (ev.type === 'rise') { sound.whoosh(55, 120, 7, 0.34, 0.6); sound.whoosh(140, 60, 12, 0.22, 0.5); }
     else if (ev.type === 'heave') { fx.burst(tmp.set(ev.x, ev.y, ev.z), 16, { speed: ev.fall ? 3 : 8, up: ev.fall ? 0 : 11, colors: DUST, size: 1.0, life: 2.1, gravity: 9, spread: 2 }); if (Math.random() < 0.06) sound.whoosh(90, 45, 1.4, 0.2, 0.8); }

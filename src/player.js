@@ -107,6 +107,9 @@ export class Player {
     this.vel.set(0, 0, 0); this.ride = null; this.seat = null; this.gliding = false; this.surfing = false;
   }
 
+  /** Thrown: carried to a place in a high arc, and quicker than being floated back. */
+  fling(to, dur = 2.3, arc = 15) { this.safe.copy(to); this.floatBack(); this.lift.dur = dur; this.lift.arc = arc; }
+
   release(up) {
     this.vel.copy(this._tan).multiplyScalar(13);
     this.vel.y = Math.max(this.vel.y, up);
@@ -132,10 +135,10 @@ export class Player {
     // --- floating back up after a fall
     if (this.lift) {
       const L = this.lift;
-      L.t += dt / 1.8;
-      const e = smooth(clamp(L.t, 0, 1));
+      L.t += dt / (L.dur || 1.8);
+      const e = L.arc ? clamp(L.t, 0, 1) : smooth(clamp(L.t, 0, 1));          // (thrown, it goes at one pace; floated back, it sets off and arrives gently)
       this.pos.lerpVectors(L.from, L.to, e);
-      this.pos.y += Math.sin(Math.PI * e) * 7;
+      this.pos.y += Math.sin(Math.PI * e) * (L.arc || 7);
       this.heading += dt * 3;
       this.grounded = false; this.gliding = true;
       if (L.t >= 1) { this.pos.copy(L.to); this.lift = null; this.grounded = true; this.gliding = false; this.jumps = 0; ev.push('settle'); }
@@ -210,7 +213,8 @@ export class Player {
     // obstacles
     for (const c of world.colliders) {
       const top = c.roof ? c.roof(this.pos.x, this.pos.z) : c.top;          // (some tops are tipped: how high, just here)
-      if (top !== undefined && Math.max(y0, this.pos.y) >= top - 0.05) continue;        // above it, or was as this step began: nothing in the way (so what has a floor on top is landed on, not slid off)
+      if (top !== undefined && Math.max(y0, this.pos.y) >= top - 0.05) continue;
+      if (c.bottom !== undefined && this.pos.y + 1.7 < c.bottom) continue;          // (under it, with room to spare)        // above it, or was as this step began: nothing in the way (so what has a floor on top is landed on, not slid off)
       const dx = this.pos.x - c.x, dz = this.pos.z - c.z, rr2 = c.r + this.radius;
       const d2 = dx * dx + dz * dz;
       if (d2 < rr2 * rr2 && d2 > 1e-6) {
