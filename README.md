@@ -75,7 +75,7 @@ There the picture stops explaining itself: the hour is yours to set, some things
 - **The sand keeps the mark of whatever crosses it**: a furrow behind you, a wider one when you skate, a hollow where you land, a scoop where the brush strikes. The wind fills them in again, slowly.
 - **Statues are sunk in it**: an avenue of seated figures, each pair deeper than the last, a great head thrown back, an open hand big enough to stand in.
 - **The tower** leans, and is buried to half its height. The way up is round the outside: a stair with a gap in it, beams, platforms hung on ropes, a drum that throws you up, and at the last the evening wind, which lifts a gliding painter to the roof. If you fall from above one of its three galleries, the paint carries you back to that gallery; gliding down is left alone.
-- **The beam** at the very top looks out over everything. Walk to the end of it and the view goes once round you, and the picture is finished.
+- **The beam** at the very top looks out over everything. Walk to the end of it and the view goes once round you, and the picture is finished. Then the great head in the sand opens its eyes. All of whoever it belongs to was standing under the sand the whole time: it comes up, as tall as the tower, stands on the island, and looks at you. It does nothing else.
 
 You reach the gallery through a frame that stands on the Blank Page once the Underpainting is finished; after that a frame in the atelier leads straight there. To try it straight away, add `?gallery` to the address. What happens once the picture is finished is best found out by playing.
 

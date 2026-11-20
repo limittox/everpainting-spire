@@ -652,6 +652,20 @@ function updateCamera(dt, snap = false) {
     camera.position.lerp(tmp.set(p.x + Math.sin(a) * far, p.y + 3 + game.surveyT * 0.95, p.z + Math.cos(a) * far), e);
     camera.lookAt(tmp2.copy(camTarget).lerp(tmp.set(p.x, p.y + 1 - game.surveyT * 0.35, p.z), e));          // (looking down more as it goes: at the painter, and then at everything under them)
   }
+  // what the look-out woke. The eye has two places, each told as a bearing and a distance from the tower and a height:
+  // down on the sand in front of the head, going up with it as it comes; and over the painter's shoulder on the roof,
+  // which the head ends level with. It goes from the one to the other round the outside of the tower.
+  game.wakeK = clamp((game.wakeK || 0) + (game.waking ? dt / 2.6 : -dt / 2.2), 0, 1);
+  if (game.wakeK > 0) {
+    const e = game.wakeK * game.wakeK * (3 - 2 * game.wakeK), p = player.pos, h = dunes.giantHead(tmp2), k = dunes.giantK, ax = dunes.axis, dx = p.x - h.x, dz = p.z - h.z, d = Math.hypot(dx, dz) || 1;
+    const qx = p.x + (dx / d) * 11 - (dz / d) * 4.5 - ax.x, qz = p.z + (dz / d) * 11 + (dx / d) * 4.5 - ax.z, a2 = Math.atan2(qx, qz), ah = Math.atan2(h.x - ax.x, h.z - ax.z);
+    const a1 = ah + Math.sign(angDiff(a2, ah)) * 0.712,          // (between a statue and a pillar of the avenue, which frame it)
+    b = clamp((k - 0.5) / 0.45, 0, 1), bb = b * b * (3 - 2 * b), a = a1 + angDiff(a2, a1) * bb, r = lerp(41.3, Math.hypot(qx, qz), bb);
+    const shake = k > 0 && k < 1 ? 0.07 : 0;
+    camera.fov += (lerp(50, 58, k) - camera.fov) * e; camera.updateProjectionMatrix();
+    camera.position.lerp(tmp.set(ax.x + Math.sin(a) * r + Math.sin(uTime.value * 37) * shake, lerp(Math.max(dunes.giantSand + 2.5, h.y - 5), p.y + 3.4, bb) + Math.sin(uTime.value * 29) * shake, ax.z + Math.cos(a) * r), e);
+    camera.lookAt(tmp.copy(camTarget).lerp(h, e));
+  }
 }
 
 const UP = new V3(0, 1, 0);
@@ -981,8 +995,17 @@ function updateSurvey(dt, t) {
   // (once round, and then it is over; or sooner, for whoever has seen it)
   if (game.surveyT > 13.5 || (game.surveyT > 3 && ['KeyE', 'Space', 'Enter', 'Attack'].some((k) => pressed.has(k)))) {
     game.survey = false; game.lookIdle = 0;
-    if (!dunes.done) { dunes.surveyed(); hud.toast('The Sunken Tower', 'From noon to night', 5200); saveSoon(); }
+    if (!dunes.done) { dunes.surveyed(); hud.toast('The Sunken Tower', 'From noon to night', 5200); saveSoon(); dunes.wake(); game.waking = true; game.wakeT = 0; game.wakeK = 1; game.surveyK = 0; }
   }
+  updateCamera(dt);
+}
+// (and then the head in the sand wakes: the eye stays on it while it comes up, unless the painter would rather not wait)
+function updateWaking(dt, t) {
+  game.wakeT += dt;
+  player.update(dt, t, IDLE, view.yaw, world);
+  for (const b of blots) b.update(dt, t, player);
+  hud.prompt(null);
+  if (game.wakeT > 22 || (game.wakeT > 4 && ['KeyE', 'Space', 'Enter', 'Attack'].some((k) => pressed.has(k)))) { game.waking = false; game.lookIdle = 0; const h = dunes.giantHead(tmp2); game.yaw = Math.atan2(h.x - player.pos.x, h.z - player.pos.z) + Math.PI; game.pitch = 0.06; }
   updateCamera(dt);
 }
 
@@ -1074,6 +1097,7 @@ function updatePlay(dt, t) {
   if (game.rest) { updateRest(dt, t); return; }
   if (game.scope) { updateScope(dt, t); return; }
   if (game.survey) { updateSurvey(dt, t); return; }
+  if (game.waking) { updateWaking(dt, t); return; }
   if (gallery.ending) { updateEnding(dt, t); return; }
   const input = {
     mx: (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0),
@@ -1431,6 +1455,10 @@ function tick(dt) {
     if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
     else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
     else if (ev.type === 'back') sound.play('wind');
+    else if (ev.type === 'stir') { sound.whoosh(80, 38, 3.6, 0.3, 0.7); sound.bell(55, sound.ctx ? sound.ctx.currentTime + 1.2 : 0, 0.12, 5); }
+    else if (ev.type === 'rise') { sound.whoosh(55, 120, 7, 0.34, 0.6); sound.whoosh(140, 60, 12, 0.22, 0.5); }
+    else if (ev.type === 'heave') { fx.burst(tmp.set(ev.x, ev.y, ev.z), 16, { speed: ev.fall ? 3 : 8, up: ev.fall ? 0 : 11, colors: DUST, size: 1.0, life: 2.1, gravity: 9, spread: 2 }); if (Math.random() < 0.06) sound.whoosh(90, 45, 1.4, 0.2, 0.8); }
+    else if (ev.type === 'stood') { sound.whoosh(130, 34, 3, 0.36, 0.7); if (sound.ctx) [55, 82.41, 110].forEach((f, i) => sound.bell(f, sound.ctx.currentTime + 0.4 + i * 0.5, 0.14, 6)); fx.burst(tmp.set(ev.x, ev.y, ev.z), 90, { speed: 16, up: 5, colors: DUST, size: 1.3, life: 2.6, gravity: 5, spread: 6 }); }
     else if (ev.type === 'ring') { sound.pluck(true); fx.burst(ev.at, 40, { speed: 6, up: 7, colors: ['#fff6d0', '#ffd060', '#ff9a3a'], size: 0.42, life: 1.2, boost: 1.5 }); }
     else if (ev.type === 'orb') { sound.play('spark'); fx.burst(ev.at, 30, { speed: 5, up: 6, colors: ['#fff6d0', '#ffd060', '#ffffff'], size: 0.4, life: 1.1, boost: 1.5 }); }
     else if (ev.type === 'gate') { sound.play('bridge'); sound.pluck(true); fx.burst(ev.at, 70, { speed: 7, up: 8, colors: ['#8ff6ff', '#58d0c0', '#ffffff', '#ffd060'], size: 0.45, life: 1.4, gravity: 5, boost: 1.5 }); saveSoon(); }

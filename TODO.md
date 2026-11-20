@@ -15,6 +15,7 @@ What still needs adding, changing or fixing. Finished items are deleted, not tic
 - (asked) Camera: looking up stops when the camera meets the ground, which limits how far up the player can see. Do what most third-person games do: let the camera slide in closer to the painter along the ground as the look goes higher, so the view keeps tilting up.
 - (noted) The Sunken Tower: while the gate is shut, the first stretch of the chain is closed from the sides by a wall that cannot be seen. Something visible there (the light carried along the rails) would be more honest.
 - (noted) The Sunken Tower: the mesas, the two great heads and the buried figure down in the open desert still have one rough circle each to walk into. The stone on the island is fitted to its shape now; these are not.
+- (noted) The Sunken Tower: the one that wakes comes straight up and stands; its arms and legs do not climb. Its legs are two plain drums to walk into, and the space between them is open.
 - (noted) The Sunken Tower: from the chain, the nearest mesa reads as a plain leaning cylinder. It wants some shape.
 
 ## Fix
@@ -31,5 +32,6 @@ Built and tested by script and still pictures only; nobody has played these yet.
 - The Sunken Tower: the gate at the chain: whether the line and the picture in the gate are enough to send a player to the palms, how the lit track and the spark at the shoulder look in motion, and the sounds.
 - The Sunken Tower: walking into and standing on the island's stone (statues, pillars, fallen drums, the hand, the great head), and walking into the drum on the tower from its platform.
 - The first islands: landing on the Spire's roofs, since the rule for what counts as "above" a thing changed for everything with a top.
+- The Sunken Tower: the one under the sand waking after the look-out: how the rise reads in motion (the dust, the shake, the pace), the sounds, skipping it with E or Space, and how it looks from the sand in daylight.
 - The Sunken Tower at a low frame rate: staying on the steep sand and on the chain at full push.
 - The desert's new shaders (sand, water) on a slow machine or a phone.
