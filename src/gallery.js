@@ -264,9 +264,9 @@ export class Gallery {
       this.hang = (lvl) => {
         const at = hp(Math.PI * 0.3, 15.5), back = arrive(at, centre(HALL), hall, flat(HALL)), f0 = lvl.frames[0];
         stand(lit(frame(W, H, picture(...lvl.picture), lvl.title), H), at, centre(HALL));
-        for (const f of lvl.frames) stand(lit(frame(W, H, pic.hall, 'The Gallery'), H), f.at, f.face);
+        for (const f of lvl.frames) { f.mesh = stand(lit(frame(W, H, pic.hall, 'The Gallery'), H), f.at, f.face); f.collider = world.colliders[world.colliders.length - 1]; }          // (kept: a picture may have a frame that is not there yet)
         this.doors.push({ at, text: 'Step into ' + lvl.title, to: arrive(f0.at, f0.face, lvl.land,(x, z) => world.groundHeight(x, z, 1e9)), toast: lvl.toast });
-        for (const f of lvl.frames) this.doors.push({ at: f.at, text: 'Step back into the Gallery', to: back, toast: ['The Gallery', ''], out: true });
+        for (const f of lvl.frames) this.doors.push({ at: f.at, text: 'Step back into the Gallery', to: back, toast: ['The Gallery', ''], out: true, open: () => !f.open || f.open() });
         lvl.frameAt = at; this.dunes = lvl;
       };
 

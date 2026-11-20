@@ -6,7 +6,6 @@ What still needs adding, changing or fixing. Finished items are deleted, not tic
 ## Add
 
 - (asked) After the portrait, in the black-and-white world, the painter's own strokes should be the only colour. Needs a paint mask in the post-process; with only Cream left it would show nothing as things stand.
-- (asked) The Sunken Tower: the inside of the one that wakes. From its right shoulder, where the hoops throw the painter, its ear is open: the painter goes in through it. Inside are its workings, intricately made: cogs, bolts, things turning. The aim is to go down through them, find its heart, and paint the heart red. When the heart is painted, the blue circle in its chest opens, puts the painter outside, and sends them back to the top of the tower in a beam of blue light. Only then is the gallery door there on the roof, to go back through.
 - (noted) Controller support. Keyboard, mouse and touch work; a gamepad does not.
 - (noted) Key remapping in the settings panel.
 - (noted) The Underpainting: companions that hold a colour somewhere in the level. Deferred when level two was finished.
@@ -16,6 +15,7 @@ What still needs adding, changing or fixing. Finished items are deleted, not tic
 - (asked) Camera: looking up stops when the camera meets the ground, which limits how far up the player can see. Do what most third-person games do: let the camera slide in closer to the painter along the ground as the look goes higher, so the view keeps tilting up.
 - (noted) The Sunken Tower: while the gate is shut, the first stretch of the chain is closed from the sides by a wall that cannot be seen. Something visible there (the light carried along the rails) would be more honest.
 - (noted) The Sunken Tower: the mesas, the two great heads and the buried figure down in the open desert still have one rough circle each to walk into. The stone on the island is fitted to its shape now; these are not.
+- (noted) The Sunken Tower: inside the one that wakes, the workings are a first version: one shaft, a stair of eleven wheels, an axle, wall wheels, rods, pipes. More could turn and mesh, and there is only one way down. There is also no way back up from the bottom before the heart is painted.
 - (noted) The Sunken Tower: the one that wakes comes straight up and stands; its arms and legs do not climb. Its legs are two plain drums to walk into, and the space between them is open.
 - (noted) The Sunken Tower: from the chain, the nearest mesa reads as a plain leaning cylinder. It wants some shape.
 
@@ -35,5 +35,6 @@ Built and tested by script and still pictures only; nobody has played these yet.
 - The first islands: landing on the Spire's roofs, since the rule for what counts as "above" a thing changed for everything with a top.
 - The Sunken Tower: the one under the sand waking after the look-out: how the rise reads in motion (the dust, the shake, the pace), the sounds, skipping it with E or Space, and how it looks from the sand in daylight.
 - The Sunken Tower: the hoops on the roof (still at first, turning once the one under the sand stands), jumping into them and being thrown onto its right shoulder; and walking about on it, under it and into it.
+- The Sunken Tower: inside the one that wakes: finding the ear from the shoulder, riding the wheels down, painting the heart with a real swing and a real red, the door, the blue beam back to the roof, and the gallery frame appearing there. And the look of its new detail up close.
 - The Sunken Tower at a low frame rate: staying on the steep sand and on the chain at full push.
 - The desert's new shaders (sand, water) on a slow machine or a phone.

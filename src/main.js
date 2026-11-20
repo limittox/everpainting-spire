@@ -806,7 +806,7 @@ function doSwing() {
     if (ev.day) { hud.hint('The lantern is a drawing again, and the evening is going out with it.', 8000, true); sound.pluck(true); }
     saveSoon();
   }
-  dunes.strike(sx, sz, player.pos);          // (in the desert the brush leaves its mark in the sand as well)
+  dunes.strike(sx, sz, player.pos, hex);          // (in the desert the brush leaves its mark in the sand as well)
   for (const ev of gallery.strike(sx, sz, player.pos, hex)) {
     fx.burst(ev.at, 46, { speed: 5, up: 6, colors: ['#fff4dc', '#ffffff', '#f1ece2'], size: 0.4, life: 1.3, gravity: 5 });
     sound.play('paint'); sound.pluck(true);
@@ -1455,6 +1455,9 @@ function tick(dt) {
     if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
     else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
     else if (ev.type === 'back') sound.play('wind');
+    else if (ev.type === 'goto') { moveTo(ev.pos, ev.heading, ev.yaw); sound.play('wind'); if (ev.toast) hud.toast(ev.toast[0], ev.toast[1], 4200); if (ev.fling) { player.fling(ev.fling, 3.6, 7); sound.whoosh(400, 3200, 2.8, 0.22, 0.6); if (sound.ctx) [392, 587.33, 783.99, 1174.66].forEach((f, i) => sound.bell(f, sound.ctx.currentTime + i * 0.3, 0.1, 3)); } }
+    else if (ev.type === 'heart') { sound.play('finale'); fx.burst(ev.at, 110, { speed: 9, up: 6, colors: ['#e02436', '#ff5a5a', '#ffd0c0', '#ffffff'], size: 0.5, life: 1.8, gravity: 3, boost: 1.5 }); game.jolt = 0.5; hud.toast('The heart', 'It beats', 4600); saveSoon(); }
+    else if (ev.type === 'wrongheart') { sound.play('paint'); fx.burst(ev.at, 30, { speed: 5, up: 4, colors: [ev.hex, ev.hex, '#ffffff'], size: 0.4, life: 1 }); hint('heartred', 'It takes the colour. But a heart wants to be red.', 8500, true); }
     else if (ev.type === 'fling') { sound.whoosh(300, 2600, 1.3, 0.2, 0.7); sound.play('wings'); sound.pluck(true); fx.burst(ev.at, 50, { speed: 8, up: 6, colors: ['#fff6d0', '#ffd060', '#ffffff'], size: 0.45, life: 1.3, gravity: 4, boost: 1.5 }); }
     else if (ev.type === 'stir') { sound.whoosh(80, 38, 3.6, 0.3, 0.7); sound.bell(55, sound.ctx ? sound.ctx.currentTime + 1.2 : 0, 0.12, 5); }
     else if (ev.type === 'rise') { sound.whoosh(55, 120, 7, 0.34, 0.6); sound.whoosh(140, 60, 12, 0.22, 0.5); }
