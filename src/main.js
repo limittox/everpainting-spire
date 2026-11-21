@@ -1461,7 +1461,8 @@ function tick(dt) {
     else if (ev.type === 'fling') { sound.whoosh(300, 2600, 1.3, 0.2, 0.7); sound.play('wings'); sound.pluck(true); fx.burst(ev.at, 50, { speed: 8, up: 6, colors: ['#fff6d0', '#ffd060', '#ffffff'], size: 0.45, life: 1.3, gravity: 4, boost: 1.5 }); }
     else if (ev.type === 'stir') { sound.whoosh(80, 38, 3.6, 0.3, 0.7); sound.bell(55, sound.ctx ? sound.ctx.currentTime + 1.2 : 0, 0.12, 5); }
     else if (ev.type === 'rise') { sound.whoosh(55, 120, 7, 0.34, 0.6); sound.whoosh(140, 60, 12, 0.22, 0.5); }
-    else if (ev.type === 'heave') { fx.burst(tmp.set(ev.x, ev.y, ev.z), 16, { speed: ev.fall ? 3 : 8, up: ev.fall ? 0 : 11, colors: DUST, size: 1.0, life: 2.1, gravity: 9, spread: 2 }); if (Math.random() < 0.06) sound.whoosh(90, 45, 1.4, 0.2, 0.8); }
+    else if (ev.type === 'worm') { const k = clamp(1 - ev.d / 520, 0, 1); if (k > 0.02) { sound.whoosh(55, 130, 5, 0.32 * k, 0.6); sound.whoosh(130, 48, 8, 0.2 * k, 0.5); } }
+    else if (ev.type === 'heave') { fx.burst(tmp.set(ev.x, ev.y, ev.z), ev.n || 16, { speed: ev.fall ? 3 : 8, up: ev.fall ? 0 : 11, colors: DUST, size: 1.0, life: 2.1, gravity: 9, spread: 2 }); if (Math.random() < 0.06) sound.whoosh(90, 45, 1.4, 0.2, 0.8); }
     else if (ev.type === 'stood') { sound.whoosh(130, 34, 3, 0.36, 0.7); if (sound.ctx) [55, 82.41, 110].forEach((f, i) => sound.bell(f, sound.ctx.currentTime + 0.4 + i * 0.5, 0.14, 6)); fx.burst(tmp.set(ev.x, ev.y, ev.z), 90, { speed: 16, up: 5, colors: DUST, size: 1.3, life: 2.6, gravity: 5, spread: 6 }); }
     else if (ev.type === 'ring') { sound.pluck(true); fx.burst(ev.at, 40, { speed: 6, up: 7, colors: ['#fff6d0', '#ffd060', '#ff9a3a'], size: 0.42, life: 1.2, boost: 1.5 }); }
     else if (ev.type === 'orb') { sound.play('spark'); fx.burst(ev.at, 30, { speed: 5, up: 6, colors: ['#fff6d0', '#ffd060', '#ffffff'], size: 0.4, life: 1.1, boost: 1.5 }); }

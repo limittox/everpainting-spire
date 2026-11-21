@@ -778,6 +778,41 @@ export class Dunes {
       this.sectors = new Uint8Array(24); this.dotN = 0; this.dotAt = new V3(); this.gateK = 1; this.linger = 0;
     }
 
+    // ================================================================================== the worm
+    // Something very long lives under the open desert, and goes round it for ever: under the sand, where all that shows
+    // of it is the sand it throws up as it goes; and twice in every round it comes out, goes over in an arch as high as a
+    // dune, and goes in again. It takes no notice of the painter, and the painter cannot touch it. (Its round is a circle
+    // that misses the island, the rocks and the oasis; the arches are at two places on it, one of them where it is seen
+    // from the top of the hill the painter comes in on.)
+    {
+      const R = 7, N = 40, GAP = 5.2, B = R + 2.5, CX = X0 - 10, CZ = Z0 + 320, RC = 200, LAP = TAU * RC;
+      const ARCS = [[deg(35) * RC - 75, 150, 52], [deg(250) * RC - 75, 150, 46]];          // (where each arch begins on the round, how long it is, how high)
+      const HIDE = ['#a8744a', '#96663e', '#b88458', '#845834'], BELLY = ['#e2c08a', '#d4b078', '#ecd09c'], put = (b, g, pal, o = { scale: 0.12, spread: 0.8 }) => b.add(daub(g, pal, o));
+      // one length of it, lying along its own z: a drum of hide, a darker band where it meets the next, a pale belly, and three plates of blue along its back
+      const one = new Bag();
+      put(one, place(new THREE.CylinderGeometry(R, R * 0.97, 6.6, 14), 0, 0, 0, Math.PI / 2), HIDE); put(one, place(new THREE.CylinderGeometry(R * 1.05, R * 1.05, 1.1, 14), 0, 0, 2.6, Math.PI / 2), SHADE); put(one, box(R * 1.1, 0.6, 5.2, 0, -R * 0.96, 0), BELLY);
+      for (const [a, k] of [[0, 1.5], [-0.6, 1], [0.6, 1]]) put(one, place(new THREE.ConeGeometry(1.5 * k, 3.4 * k, 4), Math.sin(a) * (R + k), Math.cos(a) * (R + k), 0, 0, 0, -a), TILE, { scale: 0.5, spread: 1 });
+      // its head: blunt, narrowing to a round mouth that is dark inside, with a pale lip and a ring of teeth
+      const hd = new Bag();
+      put(hd, place(new THREE.CylinderGeometry(R * 0.66, R * 1.02, 11.4, 14), 0, 0, 1.7, Math.PI / 2), HIDE); put(hd, place(new THREE.TorusGeometry(R * 0.64, 0.75, 6, 18), 0, 0, 7.4), BELLY);
+      for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; put(hd, place(new THREE.ConeGeometry(0.55, 2.4, 5), Math.cos(a) * R * 0.5, Math.sin(a) * R * 0.5, 7.5, 0, 0, a + Math.PI / 2), LIT, { scale: 0.6 }); }
+      for (const [a, k] of [[0, 1.2], [-0.7, 0.8], [0.7, 0.8]]) put(hd, place(new THREE.ConeGeometry(1.5 * k, 3.4 * k, 4), Math.sin(a) * (R * 0.9 + k), Math.cos(a) * (R * 0.9 + k), 1, 0, 0, -a), TILE, { scale: 0.5, spread: 1 });
+      const mat = stoneMat(), body = one.mesh(mat).geometry, g = new THREE.Group(), parts = [];
+      for (let i = 0; i < N; i++) {
+        const m = i ? new THREE.Mesh(body, mat) : hd.mesh(mat), k = i < N - 12 ? 1 : 0.22 + (0.78 * (N - 1 - i)) / 12;          // (the last of it tapers to a tail)
+        if (!i) { const maw = new THREE.Mesh(new THREE.CircleGeometry(R * 0.62, 18), new THREE.MeshBasicMaterial({ color: 0x1c0a08, fog: false })); maw.position.z = 6.4; m.add(maw); }
+        m.scale.set(k, k, 1); m.frustumCulled = false; g.add(m); parts.push(m);
+      }
+      g.visible = false; scene.add(g); this.all.push(g);
+      /** Where it is, a distance d along its round: down in the sand, or up over it in an arch. */
+      const at = (d, out) => {
+        const m = ((d % LAP) + LAP) % LAP, th = m / RC, x = CX + Math.sin(th) * RC, z = CZ + Math.cos(th) * RC; let off = -B;
+        for (const [a, L, H] of ARCS) { const t = (m - a) / L; if (t > 0 && t < 1) off = -B + (H + B) * Math.sin(Math.PI * t); }
+        return out.set(x, desertH(x, z) + off, z);
+      };
+      this.worm = { parts, at, d: 0, puff: 0, sign: 0, GAP, R, LAP, ARCS, long: N * GAP, first: ARCS[0][0] - 150 };
+    }
+
     // the sky of this picture: a sun that can be seen going down, and then every star there is
     this.sky = new THREE.Group(); this.sky.visible = false;
     {
@@ -911,7 +946,7 @@ export class Dunes {
     this.below = h < -8 && p.y - under < 4;          // (down in the open desert, and not on the chain up out of it)
     // (stepping in: it is noon again, whatever hour it was left at; and nothing has crossed the sand down here)
     if (!this.was) {
-      this.was = true; this.far = 0; this.day = 0; this.from = 0; this.glid = false; this.up = false; this.wasGround = true; this.surge = 0; this.chainF = 2; for (const q of this.tiles) q.lit = false;
+      this.was = true; this.far = 0; this.day = 0; this.from = 0; this.glid = false; this.up = false; this.wasGround = true; this.surge = 0; this.chainF = 2; for (const q of this.tiles) q.lit = false; this.worm.d = this.worm.first;
       if (!this.open) { this.orb = 0; this.sectors.fill(0); this.dotN = 0; this.spark.hidden = true; } this.gateK = this.open ? 0 : 1; this.linger = 0;
       const m = this.low; m.c.fillStyle = GREY; m.c.fillRect(0, 0, 1024, 1024); m.x0 = p.x - m.size / 2; m.z0 = p.z - m.size / 2; m.dirty = true;
     }
@@ -957,6 +992,24 @@ export class Dunes {
       });
       this.chainF = on ? f : 2;
       this.surge *= Math.exp(-(on ? 0.6 : 3) * dt); if (this.surge > 0.5) player.rush = Math.max(player.rush, this.surge);          // shortcut: capped at 15 so a slow frame's step still fits the painter's step-up; raise both together
+    }
+
+    // ---- the worm: on round its circle; every length of it where the head was a moment before. Where it is coming out of
+    // the sand or going into it, the sand is thrown up and left churned; and while its head is under, a little is thrown
+    // up over it, so that it can be seen coming.
+    {
+      const W = this.worm, v = this._v, was = W.d; W.d += 30 * dt;
+      W.parts.forEach((m, i) => { const d = W.d - i * W.GAP; W.at(d, m.position); m.lookAt(W.at(d + 2, v)); });
+      const lap = ((W.d % W.LAP) + W.LAP) % W.LAP, before = ((was % W.LAP) + W.LAP) % W.LAP; let out = false;
+      W.puff -= dt; W.sign -= dt;
+      for (const [a, L] of W.ARCS) {
+        if (before < a && lap >= a) ev.push({ type: 'worm', d: Math.hypot(p.x - W.parts[0].position.x, p.z - W.parts[0].position.z) });
+        for (const e of [a, a + L]) {
+          if (lap - e > 0 && lap - e < W.long) { out = true; if (W.puff <= 0) { W.at(W.d - (lap - e), v); const x = v.x + (Math.random() - 0.5) * W.R * 2, z = v.z + (Math.random() - 0.5) * W.R * 2; ev.push({ type: 'heave', x, y: desertH(x, z) + 1, z, n: 9 }); this.dig(x, z, W.R * 0.8, 0.7, this.low); } }
+        }
+      }
+      if (W.puff <= 0) W.puff = 0.1;
+      if (!out && W.sign <= 0) { W.sign = 0.3; const h = W.parts[0].position; ev.push({ type: 'heave', x: h.x, y: desertH(h.x, h.z) + 0.5, z: h.z, n: 4, fall: true }); }
     }
 
     // ---- the one under the sand: asleep, it is a head lying in it. Awake: its eyes open, its head comes round to the
