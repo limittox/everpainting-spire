@@ -1455,6 +1455,8 @@ function tick(dt) {
     if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
     else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
     else if (ev.type === 'back') sound.play('wind');
+    else if (ev.type === 'mount') { sound.play('wind'); sound.whoosh(200, 1200, 1.2, 0.16, 0.7); sound.pluck(true); }
+    else if (ev.type === 'dismount') { sound.play('jump'); sound.play('glide'); }
     else if (ev.type === 'bell') sound.chime(ev.n);
     else if (ev.type === 'clink') { sound.play('step'); if (sound.ctx) sound.bell(1300 + Math.random() * 600, sound.ctx.currentTime, 0.06, 0.35); }
     else if (ev.type === 'flock') { sound.play('wings'); sound.play('rustle'); }
