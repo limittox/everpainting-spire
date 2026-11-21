@@ -38,5 +38,6 @@ Built and tested by script and still pictures only; nobody has played these yet.
 - The Sunken Tower: the hoops on the roof (still at first, turning once the one under the sand stands), jumping into them and being thrown onto its right shoulder; and walking about on it, under it and into it.
 - The Sunken Tower: inside the one that wakes: finding the ear from the shoulder, riding the wheels down, painting the heart with a real swing and a real red, the door, the blue beam back to the roof, and the gallery frame appearing there. And the look of its new detail up close.
 - The Sunken Tower: the worm in the open desert: how the arch reads in motion from the hill and from close by, its mouth seen from in front, the sand it throws up, the rumble, and how it looks at night from the island.
+- The Sunken Tower: everything in desertlife.js. Seen in stills or checked by numbers only: the camp, the arches, the bells ringing, a jar going over, a lizard running, the fox leaving, the lanterns lighting. Not seen at all: the sand off the crests and the weeds in motion, the caravan, the flock (on the dune and on the giant), the moths, the fireflies, the windows in the rocks, and all the sounds.
 - The Sunken Tower at a low frame rate: staying on the steep sand and on the chain at full push.
 - The desert's new shaders (sand, water) on a slow machine or a phone.

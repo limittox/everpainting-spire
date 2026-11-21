@@ -1455,6 +1455,9 @@ function tick(dt) {
     if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
     else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
     else if (ev.type === 'back') sound.play('wind');
+    else if (ev.type === 'bell') sound.chime(ev.n);
+    else if (ev.type === 'clink') { sound.play('step'); if (sound.ctx) sound.bell(1300 + Math.random() * 600, sound.ctx.currentTime, 0.06, 0.35); }
+    else if (ev.type === 'flock') { sound.play('wings'); sound.play('rustle'); }
     else if (ev.type === 'goto') { moveTo(ev.pos, ev.heading, ev.yaw); sound.play('wind'); if (ev.toast) hud.toast(ev.toast[0], ev.toast[1], 4200); if (ev.fling) { player.fling(ev.fling, 3.6, 7); sound.whoosh(400, 3200, 2.8, 0.22, 0.6); if (sound.ctx) [392, 587.33, 783.99, 1174.66].forEach((f, i) => sound.bell(f, sound.ctx.currentTime + i * 0.3, 0.1, 3)); } }
     else if (ev.type === 'heart') { sound.play('finale'); fx.burst(ev.at, 110, { speed: 9, up: 6, colors: ['#e02436', '#ff5a5a', '#ffd0c0', '#ffffff'], size: 0.5, life: 1.8, gravity: 3, boost: 1.5 }); game.jolt = 0.5; hud.toast('The heart', 'It beats', 4600); saveSoon(); }
     else if (ev.type === 'wrongheart') { sound.play('paint'); fx.burst(ev.at, 30, { speed: 5, up: 4, colors: [ev.hex, ev.hex, '#ffffff'], size: 0.4, life: 1 }); hint('heartred', 'It takes the colour. But a heart wants to be red.', 8500, true); }

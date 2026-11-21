@@ -6,6 +6,7 @@ import { ground } from './gallery.js';
 import { DUNE_SUN } from './day.js';
 import { Spark } from './entities.js';
 import { Works } from './works.js';
+import { DesertLife } from './desertlife.js';
 
 // The Sunken Tower: another picture in the gallery. A desert adrift in the sky, sand going over its edges; statues
 // that the sand has had for a long time; and a great tower, leaning, sunk in it to half its height.
@@ -512,8 +513,9 @@ export class Dunes {
     for (const th of [0.5, 1.9, 3.0, 4.2, 5.5]) { const r = rimR(isl, th) - 0.5, lip = new V3(X0 + Math.cos(th) * r, 0, Z0 + Math.sin(th) * r); lip.y = duneH(lip.x, lip.z) + 0.1; pour(lip, th, 5 + (th * 3) % 4, lip.y - desertH(lip.x, lip.z) + 1); }
     // out in the open desert: rocks standing up out of it, two more of the great heads, and one of the seated ones, in to its chest
     {
+      this.mesas = [];
       for (const [dx, dz, r, h] of [[-260, -180, 26, 120], [-190, -330, 18, 90], [310, -120, 30, 150], [220, 260, 22, 100], [-330, 140, 28, 130], [60, -420, 34, 170], [420, 90, 20, 110], [-150, 410, 24, 95]]) {
-        const y = desertH(X0 + dx, Z0 + dz) - 6;
+        const y = desertH(X0 + dx, Z0 + dz) - 6; this.mesas.push([X0 + dx, Z0 + dz, r, h, y]);
         add(place(new THREE.CylinderGeometry(r * 0.72, r, h, 9, 3), X0 + dx, y + h / 2, Z0 + dz, 0, dx, 0.03), ROCK, { scale: 0.02, spread: 0.8 });
         add(place(new THREE.CylinderGeometry(r * 0.86, r * 0.8, h * 0.07, 9), X0 + dx, y + h, Z0 + dz, 0, dx, 0.03), ROCK, { scale: 0.02, spread: 0.8 });
         world.colliders.push({ x: X0 + dx, z: Z0 + dz, r: r * 0.95, top: y + h, late: true });
@@ -813,6 +815,10 @@ export class Dunes {
       this.worm = { parts, at, d: 0, puff: 0, sign: 0, GAP, R, LAP, ARCS, long: N * GAP, first: ARCS[0][0] - 150 };
     }
 
+    // ---- and everything that makes the place lived in: wind, a camp, a caravan, lanterns, creatures, bells (desertlife.js)
+    this.life = new DesertLife(scene, world, { low: desertH, high: duneH, X0, Z0, oasis: MIRAGE, land: [LAND.x - X0, LAND.z - Z0], mesas: this.mesas, material: stoneMat, dig: (x, z, r, depth, low) => this.dig(x, z, r, depth, low ? this.low : this.top) });
+    this.all.push(this.life.root);
+
     // the sky of this picture: a sun that can be seen going down, and then every star there is
     this.sky = new THREE.Group(); this.sky.visible = false;
     {
@@ -1010,6 +1016,13 @@ export class Dunes {
       }
       if (W.puff <= 0) W.puff = 0.1;
       if (!out && W.sign <= 0) { W.sign = 0.3; const h = W.parts[0].position; ev.push({ type: 'heave', x: h.x, y: desertH(h.x, h.z) + 0.5, z: h.z, n: 4, fall: true }); }
+    }
+
+    // ---- what lives here: told the hour, where the painter is, whether the worm has just come out, and where the shoulders of the one that woke are
+    {
+      const G = this.giant, w = ev.find((e) => e.type === 'worm'), sh = G.k >= 1 ? this._sh || (this._sh = [new V3(), new V3()]) : null;
+      if (sh) { sh[0].set(-2.75 * 7.5, 10.25 * 7.5, 0).applyMatrix4(G.root.matrixWorld); sh[1].set(2.75 * 7.5, 10.25 * 7.5, 0).applyMatrix4(G.root.matrixWorld); }
+      this.life.update(dt, t, player, { day: this.day, night, below: this.below, worm: w ? w.d : null, shoulders: sh }, ev);
     }
 
     // ---- the one under the sand: asleep, it is a head lying in it. Awake: its eyes open, its head comes round to the
