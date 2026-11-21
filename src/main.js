@@ -214,7 +214,7 @@ addEventListener('mousemove', (e) => {
     const look = settings.values.look;
     if (game.scope) { scopeLook(mx * 0.0026 * look, my * 0.0022 * look * (settings.values.invert ? -1 : 1)); return; }
     game.yaw -= mx * 0.0026 * look;
-    game.pitch = clamp(game.pitch + my * 0.0022 * look * (settings.values.invert ? -1 : 1), -0.45, 1.15);
+    game.pitch = clamp(game.pitch + my * 0.0022 * look * (settings.values.invert ? -1 : 1), -1.05, 1.15);
     game.lookIdle = 0;
   }
 });
@@ -224,7 +224,7 @@ const touch = setupTouch(canvas, keys, pressed, (dx, dy) => {
   const look = settings.values.look;
   if (game.scope) { scopeLook(dx * 0.0062 * look, dy * 0.005 * look * (settings.values.invert ? -1 : 1)); return; }
   game.yaw -= dx * 0.0062 * look;
-  game.pitch = clamp(game.pitch + dy * 0.005 * look * (settings.values.invert ? -1 : 1), -0.45, 1.15);
+  game.pitch = clamp(game.pitch + dy * 0.005 * look * (settings.values.invert ? -1 : 1), -1.05, 1.15);
   game.lookIdle = 0;
 });
 addEventListener('wheel', (e) => {
@@ -621,8 +621,15 @@ function updateCamera(dt, snap = false) {
   const kh = snap ? 1 : 1 - Math.exp(-11 * dt), kv = snap ? 1 : 1 - Math.exp(-(player.grounded ? 7 : 11) * dt);
   camTarget.x += (tmp.x - camTarget.x) * kh; camTarget.z += (tmp.z - camTarget.z) * kh; camTarget.y += (tmp.y - camTarget.y) * kv;
   camPos.set(camTarget.x + Math.sin(view.yaw) * cy * dist, camTarget.y + sy * dist, camTarget.z + Math.cos(view.yaw) * cy * dist);
-  const gh = world.groundHeight(camPos.x, camPos.z, camPos.y + 3);
-  if (gh > -Infinity && camPos.y < gh + 1.1) camPos.y = gh + 1.1;
+  // Where the eye would be under the ground it comes in toward the painter along its own line, instead of being held up
+  // on the ground: so looking up goes on tilting up, as far as there is to tilt. (It comes in at once, and goes out again gently.)
+  {
+    let k = 1;
+    for (let i = 0; i < 7; i++) { const g = world.groundHeight(camPos.x, camPos.z, camPos.y + 3); if (g === -Infinity || camPos.y >= g + 0.8) break; k *= 0.74; camPos.set(camTarget.x + Math.sin(view.yaw) * cy * dist * k, camTarget.y + sy * dist * k, camTarget.z + Math.cos(view.yaw) * cy * dist * k); }
+    const was = game.boom === undefined || snap ? 1 : game.boom; game.boom = k < was ? k : Math.min(k, was + dt * 1.2);
+    if (game.boom < 1) camPos.set(camTarget.x + Math.sin(view.yaw) * cy * dist * game.boom, camTarget.y + sy * dist * game.boom, camTarget.z + Math.cos(view.yaw) * cy * dist * game.boom);
+    const g = world.groundHeight(camPos.x, camPos.z, camPos.y + 3); if (g > -Infinity && camPos.y < g + 0.45) camPos.y = g + 0.45;
+  }
   interior.clampCamera(camPos);
   camera.position.copy(camPos);
   camera.lookAt(camTarget);
@@ -1094,22 +1101,29 @@ function updateEnding(dt, t) {
 
 function updatePlay(dt, t) {
   game.playT += dt;
+  // A controller, if one is plugged in. Its buttons are the keys they stand for (A jump, X the brush, Y to do the thing in
+  // front of you, the left bumper the next paint, Start to go on); the left stick walks, the right stick looks, and B or
+  // either trigger skates.
+  const pad = navigator.getGamepads ? [...navigator.getGamepads()].find((g) => g && g.connected) : null, padWas = game.padWas || (game.padWas = []);
+  const pb = (i) => !!(pad && pad.buttons[i] && pad.buttons[i].pressed), pa = (i) => (pad && Math.abs(pad.axes[i] || 0) > 0.18 ? pad.axes[i] : 0);
+  if (pad) { [[0, 'Space'], [2, 'Attack'], [3, 'KeyE'], [4, 'KeyQ'], [9, 'Enter']].forEach(([i, k]) => { if (pb(i) && !padWas[i]) pressed.add(k); }); for (let i = 0; i < 10; i++) padWas[i] = pb(i); }
   if (game.rest) { updateRest(dt, t); return; }
   if (game.scope) { updateScope(dt, t); return; }
   if (game.survey) { updateSurvey(dt, t); return; }
   if (game.waking) { updateWaking(dt, t); return; }
   if (gallery.ending) { updateEnding(dt, t); return; }
   const input = {
-    mx: (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0),
-    mz: (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0),
-    jump: pressed.has('Space'), jumpHeld: keys.has('Space'),
-    surf: keys.has('ShiftLeft') || keys.has('ShiftRight'),
+    mx: clamp((keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0) + pa(0), -1, 1),
+    mz: clamp((keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0) - pa(1), -1, 1),
+    jump: pressed.has('Space'), jumpHeld: keys.has('Space') || pb(0),
+    surf: keys.has('ShiftLeft') || keys.has('ShiftRight') || pb(1) || pb(6) || pb(7),
   };
+  if (pa(2) || pa(3)) { game.lookIdle = 0; game.yaw -= pa(2) * dt * 2.4; game.pitch = clamp(game.pitch - pa(3) * dt * 1.4, -1.05, 1.15); }
   if (keys.has('ArrowLeft') || keys.has('ArrowRight') || keys.has('ArrowUp') || keys.has('ArrowDown')) game.lookIdle = 0;
   if (keys.has('ArrowLeft')) game.yaw += dt * 1.9;
   if (keys.has('ArrowRight')) game.yaw -= dt * 1.9;
-  if (keys.has('ArrowUp')) game.pitch = clamp(game.pitch + dt * 1.1, -0.45, 1.15);
-  if (keys.has('ArrowDown')) game.pitch = clamp(game.pitch - dt * 1.1, -0.45, 1.15);
+  if (keys.has('ArrowUp')) game.pitch = clamp(game.pitch + dt * 1.1, -1.05, 1.15);
+  if (keys.has('ArrowDown')) game.pitch = clamp(game.pitch - dt * 1.1, -1.05, 1.15);
   if (pressed.has('Attack') || keys.has('Attack') || keys.has('KeyJ') || keys.has('KeyF')) doSwing();
   const paints = palette();
   if (pressed.has('KeyQ') || pressed.has('NextPaint')) setPaint(paints[(paints.indexOf(game.paint) + 1) % paints.length]);
@@ -1455,6 +1469,11 @@ function tick(dt) {
     if (ev.type === 'dust') fx.burst(tmp.set(ev.x, ev.y + 0.1, ev.z), ev.n, { speed: ev.ring ? 4.5 : 1.6, up: ev.ring ? 2.2 : 1.4, colors: DUST, size: ev.ring ? 0.36 : 0.26, life: ev.ring ? 0.9 : 0.6, gravity: 5 });
     else if (ev.type === 'perch') { sound.play('spark'); saveSoon(); }
     else if (ev.type === 'back') sound.play('wind');
+    else if (ev.type === 'gust') sound.whoosh(150 + Math.random() * 90, 360 + Math.random() * 240, 3.4, 0.028 * ev.k, 0.5);
+    else if (ev.type === 'snap') sound.play('rustle');
+    else if (ev.type === 'faraway') { if (sound.ctx) sound.bell([329.63, 392, 440][ev.n], sound.ctx.currentTime, 0.016, 3.2); }
+    else if (ev.type === 'storm') { sound.whoosh(90, 320, 7, 0.24, 0.5); sound.whoosh(300, 120, 9, 0.12, 0.4); }
+    else if (ev.type === 'found') { sound.chime(ev.n + 2); sound.pluck(true); fx.burst(tmp.set(ev.x, ev.y, ev.z), 34, { speed: 4.5, up: 6, colors: ['#fff6d0', '#ffd060', ...DUST], size: 0.4, life: 1.2, gravity: 7, boost: 1.4 }); saveSoon(); }
     else if (ev.type === 'mount') { sound.play('wind'); sound.whoosh(200, 1200, 1.2, 0.16, 0.7); sound.pluck(true); }
     else if (ev.type === 'dismount') { sound.play('jump'); sound.play('glide'); }
     else if (ev.type === 'bell') sound.chime(ev.n);

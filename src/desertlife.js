@@ -10,6 +10,11 @@ import { daub, place, Bag, glowSprite, clamp, mulberry32 } from './util.js';
 //   to play with  arches half under the sand on the way down the hill, a row of bells that ring for whoever passes
 //                 them, jars that go over when they are brushed against
 //   night ....... moths at the lanterns, fireflies at the oasis, windows lit far off in the rocks
+//   weather ..... now and then a storm of sand crosses the open desert: amber, close, and pushing
+//   someone ..... a traveller sits by the cold fire at the camp, and has a few things to say
+//   the sky ..... stars that fall; and, once the one under the sand has woken, its shape in the stars
+//   to hear ..... the wind, the flags, bells a long way off
+//   buried ...... here and there something glints in the sand: a swing of the brush turns up what is under it
 // Nothing here can hurt, and nothing here is needed: it is all only there.
 
 const V3 = THREE.Vector3, TAU = Math.PI * 2;
@@ -128,8 +133,70 @@ export class DesertLife {
     });
     this.march = 0;
 
+    // ================================================================= a traveller, sat by the fire that went out
+    {
+      const g = new THREE.Group(), part = (w, h, d, x, y, z, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), flat(c)); m.position.set(x, y, z); g.add(m); };
+      part(1.0, 1.0, 0.9, 0, 0.5, 0, 0x34486a); part(0.8, 0.7, 0.6, 0, 1.3, -0.02, 0x34486a); part(0.5, 0.5, 0.5, 0, 1.9, 0.02, 0xc89a6a); part(0.66, 0.5, 0.62, 0, 2.02, -0.08, 0x2a3a58);
+      part(0.22, 0.22, 0.7, -0.42, 1.0, 0.35, 0x34486a); part(0.22, 0.22, 0.7, 0.42, 1.0, 0.35, 0x34486a); part(0.1, 2.6, 0.1, 0.75, 1.3, 0.3, 0x7a5a3a); part(0.9, 0.25, 0.5, 0, 0.14, 0.62, 0x34486a);
+      const x = K.x + 0.5 + 2.4, z = K.z - 6; g.position.set(x, low(x, z), z); g.rotation.y = -Math.PI / 2; root.add(g);
+      this.traveller = { g, x, z, n: 0, away: true };
+      world.colliders.push({ x, z, r: 0.7, top: g.position.y + 2.2, late: true });
+    }
+    // ================================================================= a storm of sand: three shells of amber round the eye, the nearest the thinnest
+    this.shells = [18, 36, 70].map((r, i) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 10), new THREE.MeshBasicMaterial({ color: 0xd9a25a, transparent: true, opacity: 0, side: THREE.BackSide, depthWrite: false, fog: false })); m.userData.op = [0.22, 0.4, 0.9][i]; m.renderOrder = 5; m.frustumCulled = false; root.add(m); return m; });
+    this.storm = 0; this.clock = 40; this.gust = 2; this.snap = 3; this.toll = 6;
+    // ================================================================= the sky: a star that falls; and the shape of the one that woke
+    {
+      const sky = (this.sky = new THREE.Group()); root.add(sky);
+      // (drawn as it stands: head, shoulders, arms, body, legs; on a square of sky a long way off, to the north-west and well up)
+      const pts = [[0, 9.4], [0, 8.2], [-2.8, 7.8], [2.8, 7.8], [-3.2, 4.6], [3.2, 4.6], [-3.0, 1.6], [3.0, 1.6], [0, 4.4], [-1.2, 4.0], [1.2, 4.0], [-1.3, 0.2], [1.3, 0.2], [-1.4, -3.6], [1.4, -3.6]];
+      const lines = [[0, 1], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [1, 8], [8, 9], [8, 10], [9, 11], [10, 12], [11, 13], [12, 14], [2, 3]];
+      const dir = new V3(-0.62, 0.62, -0.48).normalize(), right = new V3().crossVectors(new V3(0, 1, 0), dir).normalize(), up = new V3().crossVectors(dir, right), at = ([x, y]) => dir.clone().multiplyScalar(1300).addScaledVector(right, x * 42).addScaledVector(up, y * 42);
+      const mat = new THREE.LineBasicMaterial({ color: 0xbfd4ff, transparent: true, opacity: 0, fog: false, blending: THREE.AdditiveBlending, depthWrite: false });
+      const lg = new THREE.BufferGeometry().setFromPoints(lines.flatMap(([a, b]) => [at(pts[a]), at(pts[b])])); const ln = new THREE.LineSegments(lg, mat); ln.frustumCulled = false; sky.add(ln);
+      this.figure = { mat, stars: pts.map((q, i) => { const s = glowSprite(world.glowTex, i === 0 ? 70 : 44, 0xe6eeff, 0); s.position.copy(at(q)); sky.add(s); return s; }), k: 0 };
+      this.faller = glowSprite(world.glowTex, 30, 0xffffff, 0); this.faller.scale.set(110, 9, 1); this.faller.material.rotation = -0.55; sky.add(this.faller); this.fall = { t: 9, from: new V3(), to: new V3() };
+    }
+
+    // ================================================================= buried things: a glint in the sand, and under it something worth turning up
+    {
+      const mats = {}, mat = (c) => mats[c] || (mats[c] = flat(c)), thing = (parts) => { const g = new THREE.Group(); for (const [w, h, d, x, y, z, c, rz = 0] of parts) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); m.rotation.z = rz; g.add(m); } return g; };
+      const lathe = (pts, c) => { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), 12), flat(c, { side: THREE.DoubleSide }))); return g; };
+      const S = 0xd9b98a, G = 0xe0b860, T = 0x3fb8b0, W = 0x7a5a3a, C = 0xf0e2c0, D = 0x4a3a2c, R = 0xb8503c, B = 0xa8744a;
+      const KINDS = [
+        () => lathe([[0, 0], [0.42, 0], [0.62, 0.42], [0.54, 0.98], [0.26, 1.24], [0.36, 1.4]], T),                                                                             // a jar, glazed blue
+        () => thing([[0.9, 1.15, 0.22, 0, 0.75, 0, G], [0.96, 0.14, 0.3, 0, 1.08, 0.04, G], [0.16, 0.46, 0.3, 0, 0.8, 0.1, G], [0.3, 0.07, 0.26, -0.22, 0.95, 0.03, D], [0.3, 0.07, 0.26, 0.22, 0.95, 0.03, D], [0.36, 0.06, 0.26, 0, 0.42, 0.03, D], [1.1, 0.3, 0.2, 0, 1.46, 0, T]]),   // a mask of gilt
+        () => thing([[0.9, 0.5, 0.8, 0, 0.25, 0, S], [0.62, 0.8, 0.46, 0, 0.9, -0.05, S], [0.42, 0.42, 0.42, 0, 1.52, -0.02, S], [0.2, 0.2, 0.6, -0.26, 0.6, 0.24, S], [0.2, 0.2, 0.6, 0.26, 0.6, 0.24, S], [0.5, 0.1, 0.5, 0, 1.78, -0.02, G]]),                    // a little seated figure, like the great ones
+        () => thing(Array.from({ length: 14 }, (_, i) => { const a = (i / 14) * TAU; return [0.2, 0.2, 0.2, Math.cos(a) * 0.55, 0.5 + Math.sin(a) * 0.36, Math.sin(a) * 0.3, i % 3 ? T : G]; })),                                                            // a string of beads
+        () => thing([[0.14, 1.5, 0.14, 0, 0.85, 0, W], [0.2, 0.22, 0.2, 0, 1.68, 0, G], [0.3, 0.5, 0.3, 0, 2.02, 0, C], [0.2, 0.26, 0.2, 0, 2.36, 0, R]]),                              // a brush, somebody's, with red still on it
+        () => thing([[0.6, 0.12, 0.6, 0, 0.06, 0, G], [0.5, 0.7, 0.5, 0, 0.5, 0, C], [0.66, 0.1, 0.66, 0, 0.9, 0, G], [0.3, 0.26, 0.3, 0, 1.08, 0, G], [0.06, 0.4, 0.06, 0, 1.4, 0, W]]),                                                                  // a lantern
+        () => lathe([[0, 0.06], [0.3, 0.06], [0.34, 0.14], [0.9, 0.5], [0.96, 0.5], [0.4, 0], [0, 0]], G),                                                                           // a bowl of gilt
+        () => thing([[0.5, 0.5, 0.5, -0.9, 0.3, 0, B], [0.5, 0.5, 0.5, -0.45, 0.62, 0, B, 0.5], [0.5, 0.5, 0.5, 0.05, 0.78, 0, B], [0.5, 0.5, 0.5, 0.55, 0.62, 0, B, -0.5], [0.5, 0.5, 0.5, 1.0, 0.3, 0, B], [0.16, 0.3, 0.16, 0.05, 1.15, 0, T], [0.14, 0.24, 0.14, -0.45, 0.98, 0, T], [0.14, 0.24, 0.14, 0.55, 0.98, 0, T]]),   // the worm, small, in clay
+      ];
+      this.finds = [[108, 410, 1, 0], [124, 386, 1, 4], [30, 470, 1, 1], [-52, 508, 1, 6], [70, 214, 1, 2], [172, 352, 1, 3], [-86, 398, 1, 7], [150, 500, 1, 5], [-18, 44, 0, 3], [22, 34, 0, 1], [-26, 18, 0, 5], [34, 8, 0, 0], [6, -44, 0, 2]].map(([dx, dz, lowland, kind]) => {
+        const g = KINDS[kind](); g.scale.setScalar(1.25); g.visible = false; root.add(g);
+        return { g, x: X0 + dx, z: Z0 + dz, low: !!lowland, spark: glow(new V3(), 1.5, 0xfff2c0), t: 0, dug: false, turn: (dx * 7 + dz) % 6 };
+      });
+    }
+
     const fixed = bag.mesh(env.material()); fixed.material.side = THREE.DoubleSide; fixed.frustumCulled = false; root.add(fixed);
   }
+
+  /** What the traveller has to say to somebody stood by them: one thing each time they are come back to. */
+  talk(p) {
+    const T = this.traveller, LINES = ['You came down the hill. Most do not; most look at it from the top and go home.', 'The long one under the sand has been going round since before the tower leaned. It does not mind being sat on.', 'They say whoever is under the island only sleeps. I would not climb to the top and look about, if I were you.', 'The hoops on the roof turned once, in my grandmother\u2019s time. Nobody has said what for.'];
+    return Math.hypot(p.x - T.x, p.z - T.z) < 7 && Math.abs(p.y - T.g.position.y) < 3 ? { key: 'trav' + T.n, who: 'The traveller', line: LINES[T.n] } : null;
+  }
+  /** A swing of the brush landing at (x, z), from a painter standing at 'p': whatever is buried just there is turned up. */
+  strike(x, z, p, ev) {
+    for (const b of this.finds) {
+      if (b.dug || (x - b.x) ** 2 + (z - b.z) ** 2 > 9 || Math.abs(p.y - (b.low ? this.env.low(b.x, b.z) : this.env.high(b.x, b.z))) > 3) continue;
+      b.dug = true; b.t = 0; ev.push({ type: 'found', x: b.x, y: p.y + 0.4, z: b.z, n: this.finds.filter((q) => q.dug).length });
+    }
+  }
+  /** Which have been turned up (to be kept); and putting that back. */
+  get dug() { return this.finds.map((b) => (b.dug ? 1 : 0)); }
+  set dug(list) { this.finds.forEach((b, i) => { b.dug = !!(list && list[i]); b.t = b.dug ? 1 : 0; }); }
 
   /** `st`: day and night (0..1), is the painter down in the open desert, has the worm just come out (and how far off), where the giant's shoulders are once it stands. */
   update(dt, t, player, st, ev) {
@@ -169,7 +236,7 @@ export class DesertLife {
         w.x += WIND.x * w.v * dt; w.z += WIND.z * w.v * dt; w.m.position.set(w.x, low(w.x, w.z) + 0.85 + Math.abs(Math.sin(t * 2.2 + w.ph)) * 1.1, w.z); w.m.rotation.z -= w.v * dt * 0.9; w.m.rotation.x += dt * 0.7;
       }
     }
-    this.spin.material.opacity = down ? 0.5 : 0; for (const w of this.weeds) w.m.visible = down;
+    for (const w of this.weeds) w.m.visible = down;
 
     // ---- bells ring for whoever goes by; jars go over when they are brushed against
     this.bells.forEach((b, i) => {
@@ -214,6 +281,40 @@ export class DesertLife {
         b.g.position.set(b.roost.x + (cx + Math.cos(a) * b.r - b.roost.x) * e, b.roost.y + (cy + b.h + Math.sin(t * 0.8 + b.ph) * 2 - b.roost.y) * e, b.roost.z + (cz + Math.sin(a) * b.r - b.roost.z) * e);
         b.g.rotation.y = e > 0.02 ? -a + (b.sp > 0 ? 0 : Math.PI) : b.ph; b.w[0].rotation.z = -flap; b.w[1].rotation.z = flap;
       }
+    }
+
+    // ---- the storm: comes on every couple of minutes while the painter is out on the sand, and lasts half a minute
+    this.clock += down ? dt : 0;
+    const blowing = this.clock > 120 && this.clock < 150; if (this.clock >= 150) this.clock = 0;
+    if (blowing && this.storm === 0) ev.push({ type: 'storm' });
+    this.storm += clamp((blowing && down ? 1 : 0) - this.storm, -dt / 4, dt / 4);
+    const sk = this.storm * this.storm * (3 - 2 * this.storm);
+    for (const m of this.shells) { m.visible = sk > 0.01; m.position.copy(st.eye); m.material.opacity = m.userData.op * sk; }
+    if (sk > 0 && down && !player.lift && !player.seat) { p.x += WIND.x * 3.2 * sk * dt; p.z += WIND.z * 3.2 * sk * dt; }          // (it pushes)
+    this.spin.material.opacity = down ? 0.5 + 0.4 * sk : 0; this.spin.material.size = 1.5 + 1.5 * sk;
+    if (sk > 0.05) { const gp = this.spin.geometry.attributes.position; this.grain.forEach((g, i) => { if (i % 2 && g.y > -900) { g.x += WIND.x * 30 * sk * dt; g.z += WIND.z * 30 * sk * dt; } else if (i % 2 && Math.random() < 0.2) { g.x = p.x + (Math.random() - 0.5) * 60 - WIND.x * 20; g.z = p.z + (Math.random() - 0.5) * 60 - WIND.z * 20; g.y = low(g.x, g.z) + 0.3 + Math.random() * 5; g.vy = 0.5; g.t = 0.9; } gp.setXYZ(i, g.x, g.y, g.z); }); gp.needsUpdate = true; }
+    // ---- what there is to hear: gusts, always; the flags, at the camp; and now and then a bell from the caravan
+    if ((this.gust -= dt) <= 0) { this.gust = 2.6 + Math.random() * 3; ev.push({ type: 'gust', k: 1 + sk * 3 }); }
+    if ((this.snap -= dt) <= 0) { this.snap = 1.5 + Math.random() * 2.5; if (Math.hypot(p.x - this.traveller.x, p.z - this.traveller.z) < 26) ev.push({ type: 'snap' }); }
+    if ((this.toll -= dt) <= 0) { this.toll = 8 + Math.random() * 6; if (down) ev.push({ type: 'faraway', n: Math.floor(Math.random() * 3) }); }
+    // ---- the traveller turns their head to whoever comes; each time somebody comes back there is the next thing to say
+    { const T = this.traveller, d = Math.hypot(p.x - T.x, p.z - T.z); if (d > 13 && !T.away) { T.away = true; T.n = Math.min(T.n + 1, 3); } if (d < 7) T.away = false; T.g.children[2].rotation.y = T.g.children[3].rotation.y = d < 12 ? clamp(Math.atan2(p.x - T.x, p.z - T.z) - T.g.rotation.y, -1.1, 1.1) : 0; }
+    // ---- the sky: its shape in the stars, once it stands and it is night; and a star falling, every so often
+    this.sky.position.copy(st.eye);
+    { const F = this.figure; F.k += clamp((st.shoulders && st.night > 0.5 ? 1 : 0) - F.k, -dt / 3, dt / 14); F.mat.opacity = F.k * 0.5; F.stars.forEach((s, i) => { s.material.opacity = F.k * (0.8 + 0.2 * Math.sin(t * 1.7 + i)); }); }
+    { const f = this.fall; f.t -= dt; if (f.t <= 0) { f.t = 6 + Math.random() * 9; const a = Math.random() * TAU, e = 0.5 + Math.random() * 0.6; f.from.set(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e)).multiplyScalar(1100); f.to.copy(f.from).add(v.set(260 + Math.random() * 200, -260, 120 - Math.random() * 240)); f.run = 0.9; }
+      if (f.run > 0) { f.run -= dt; const u = 1 - f.run / 0.9; this.faller.position.lerpVectors(f.from, f.to, u); this.faller.material.opacity = st.night * Math.sin(Math.PI * clamp(u, 0, 1)); } else this.faller.material.opacity = 0; }
+
+    // ---- buried things: a glint where one lies, fainter the further off; one that has been turned up comes out, turning, and stays
+    this.near = false;
+    for (const b of this.finds) {
+      const y = ground(b.x, b.z, b.low), d = Math.hypot(p.x - b.x, p.z - b.z);
+      if (b.dug && b.t < 1) b.t = Math.min(1, b.t + dt / 1.2);
+      const e = b.t * b.t * (3 - 2 * b.t);
+      b.g.visible = b.dug; b.g.position.set(b.x, y - 2.6 + 2.7 * e, b.z); b.g.rotation.y = b.turn + (1 - e) * 7;
+      if (!b.dug && d < 9 && Math.abs(p.y - y) < 4) this.near = true;
+      b.spark.position.set(b.x, y + 0.35 + e * 1.2, b.z);
+      b.spark.material.opacity = b.dug ? (1 - e) + st.night * 0.35 * e : clamp(1.15 - d / 75, 0, 1) * (0.35 + 0.65 * Math.max(0, Math.sin(t * 3.1 + b.x)) ** 3);
     }
 
     // ---- the caravan: along a round of the far dunes, at a walk

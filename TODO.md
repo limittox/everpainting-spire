@@ -6,17 +6,16 @@ What still needs adding, changing or fixing. Finished items are deleted, not tic
 ## Add
 
 - (asked) After the portrait, in the black-and-white world, the painter's own strokes should be the only colour. Needs a paint mask in the post-process; with only Cream left it would show nothing as things stand.
-- (noted) Controller support. Keyboard, mouse and touch work; a gamepad does not.
 - (noted) Key remapping in the settings panel.
 - (noted) The Underpainting: companions that hold a colour somewhere in the level. Deferred when level two was finished.
 
 ## Change
 
-- (asked) Camera: looking up stops when the camera meets the ground, which limits how far up the player can see. Do what most third-person games do: let the camera slide in closer to the painter along the ground as the look goes higher, so the view keeps tilting up.
 - (noted) The Sunken Tower: while the gate is shut, the first stretch of the chain is closed from the sides by a wall that cannot be seen. Something visible there (the light carried along the rails) would be more honest.
 - (noted) The Sunken Tower: the mesas, the two great heads and the buried figure down in the open desert still have one rough circle each to walk into. The stone on the island is fitted to its shape now; these are not.
 - (noted) The Sunken Tower: inside the one that wakes, the workings are a first version: one shaft, a stair of eleven wheels, an axle, wall wheels, rods, pipes. More could turn and mesh, and there is only one way down. There is also no way back up from the bottom before the heart is painted.
 - (noted) The Sunken Tower: the worm keeps one fixed round and leaves no ridge in the sand over it, only thrown sand. Riding it, the painter sits with eyes half shut (the resting pose); a pose of its own would be better.
+- (noted) The held-out hand only stays there: it does not carry the painter anywhere. The wheels inside still do not mesh tooth to tooth.
 - (noted) The Sunken Tower: the one that wakes comes straight up and stands; its arms and legs do not climb. Its legs are two plain drums to walk into, and the space between them is open.
 - (noted) The Sunken Tower: from the chain, the nearest mesa reads as a plain leaning cylinder. It wants some shape.
 
@@ -40,5 +39,6 @@ Built and tested by script and still pictures only; nobody has played these yet.
 - The Sunken Tower: the worm in the open desert: how the arch reads in motion from the hill and from close by, its mouth seen from in front, the sand it throws up, the rumble, and how it looks at night from the island.
 - The Sunken Tower: everything in desertlife.js. Seen in stills or checked by numbers only: the camp, the arches, the bells ringing, a jar going over, a lizard running, the fox leaving, the lanterns lighting. Not seen at all: the sand off the crests and the weeds in motion, the caravan, the flock (on the dune and on the giant), the moths, the fireflies, the windows in the rocks, and all the sounds.
 - The Sunken Tower: riding the worm: catching it by walking or sliding into it, the ride over the arch, jumping off with Space and gliding, being thrown clear at the end, and the sounds.
+- The second batch, checked by numbers and one or two stills only: digging things up with a real swing; the storm in motion and its push; the traveller’s four lines; the camera coming in when looking up from the ground (and whether it ever jitters); the lift inside. Not checked at all: rising in the steam column (jump, then hold), stepping onto the held-out hand from the roof, falling stars and the shape in the stars, the wind, flags and far bells, and a controller (none was plugged in; the title screen still needs a click or a key).
 - The Sunken Tower at a low frame rate: staying on the steep sand and on the chain at full push.
 - The desert's new shaders (sand, water) on a slow machine or a phone.

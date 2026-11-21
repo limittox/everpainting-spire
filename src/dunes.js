@@ -592,8 +592,12 @@ export class Dunes {
       // before it stands: until then none of it is where it will be.) Its head is the egg again, asked wherever it has turned to.
       const Ei = new THREE.Matrix4(), up = () => this.giant.k >= 1, y1 = at.y - 0.45 * U;
       const stood = new THREE.Matrix4().compose(new V3(at.x, y1, at.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)), new V3(1, 1, 1));
-      const firm = (parts, m) => { for (const [g] of parts) { g.computeBoundingBox(); const d = g.boundingBox.max.clone().sub(g.boundingBox.min); if (g.type === 'BoxGeometry' && d.x * d.y * d.z > 60) solid(g.clone().applyMatrix4(m), up); } };
-      firm(bodyParts, stood); arms.forEach((a, i) => firm(armParts[i], stood.clone().multiply(new THREE.Matrix4().makeTranslation(a.position.x, a.position.y, a.position.z))));
+      const firm = (parts, m, live = up) => { for (const [g] of parts) { g.computeBoundingBox(); const d = g.boundingBox.max.clone().sub(g.boundingBox.min); if (g.type === 'BoxGeometry' && d.x * d.y * d.z > 60) solid(g.clone().applyMatrix4(m), live); } };
+      // (Its right arm has two places: down at its side; and, once its heart is going, held out level with the roof of the
+      // tower, for the painter to step onto the back of its hand. It is solid in whichever it is at, and in neither on the way.)
+      const HELD = [-Math.PI / 2 + 0.07, 0.25];          // (a little below level: so that the back of its hand comes just above the roof) this.handK = 0; arms[0].rotation.order = 'YXZ';
+      firm(bodyParts, stood); arms.forEach((a, i) => { const m = stood.clone().multiply(new THREE.Matrix4().makeTranslation(a.position.x, a.position.y, a.position.z)); firm(armParts[i], m, i ? up : () => up() && this.handK < 0.02); if (!i) firm(armParts[i], m.clone().multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(HELD[0], HELD[1], 0, 'YXZ'))), () => up() && this.handK > 0.98); });
+      this.held = HELD;
       // Its right ear is open: a doorway in the side of its head, at the height its shoulder brings the painter to, with the
       // light of what is inside showing in it.
       const ear = new THREE.Group(); ear.position.set(-0.83 * U, -0.28 * U, -0.1 * U);
@@ -879,7 +883,7 @@ export class Dunes {
   /** Is this point in the picture? (It lies east of the other one.) */
   contains(p) { return p.x > 10000; }
   /** How fast the air is rising here: only in the evening wind, at the end of the third gallery. */
-  thermal(p) { const h = p.y - this.wind.y; return h > -0.6 && h < 26 && (p.x - this.wind.x) ** 2 + (p.z - this.wind.z) ** 2 < 3.8 * 3.8 ? 12 * clamp((25 - h) / 5, 0, 1) : 0; }
+  thermal(p) { if (this.works.inside(p)) return this.works.thermal(p); const h = p.y - this.wind.y; return h > -0.6 && h < 26 && (p.x - this.wind.x) ** 2 + (p.z - this.wind.z) ** 2 < 3.8 * 3.8 ? 12 * clamp((25 - h) / 5, 0, 1) : 0; }
   /** Where to go next, for the flecks that drift toward it. */
   goal() { return this.inWorks ? this.works.goal() : this.done ? (this.hearted || this.giant.k < 1 ? null : this.flung ? this.giant.ear.getWorldPosition(this._g || (this._g = new V3())) : this.ring.position) : this.below ? (!this.open && this.orb < 2 && (this.asked || this.orb === 1) ? this.mirageAt : this.foot) : this.from >= 4 ? this.perch : this.perches[this.from + 1].p; }
 
@@ -900,13 +904,16 @@ export class Dunes {
     if (this.works.inside(p)) { this.works.strike(x, z, p, hex, this.events); return; }
     const tr = Math.abs(duneH(x, z) - p.y) < 1.5 ? this.top : Math.abs(desertH(x, z) - p.y) < 1.5 ? this.low : null;
     if (tr) { this.dig(x, z, 1.25, 0.6, tr); this.events.push({ type: 'dust', x, y: p.y, z, n: 10 }); }
+    this.life.strike(x, z, p, this.events);          // (and what was under the sand there comes up)
   }
 
   /** Something here that is worth a word. */
   waiting(p) {
     if (!this.contains(p)) return null;
     if (this.works.inside(p)) return this.works.waiting(p);
+    { const said = this.life.talk(p); if (said) return said; }
     const h = p.y - Y0, near = (q, r) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < r * r;
+    if (this.life.near) return { key: 'glint', line: 'Something glints in the sand here. A swing of the brush would turn it up.' };
     if (this.wormNear && this.worm.rider < 0) return { key: 'worm', line: 'Whatever it is, it takes no notice of you. Its back is broad.' };
     if (this.below) {
       if (!this.open && this.orb < 2 && near(this.foot, 30)) return { key: 'gate', loud: true, line: 'The way up is shut. It opens for whoever draws a ring round the one thing out here that is real.' };
@@ -919,6 +926,7 @@ export class Dunes {
     }
     if (this.giant.T > 17 && this.giant.T < 34 && h > TOP - 1) return { key: 'woken', line: 'It was under the sand all the while. It does nothing. It looks.' };
     if (this.spin > 0.8 && !this.flung && h > TOP - 1 && near(this.ring.position, 11)) return { key: 'hoops', line: 'The hoops have begun to turn. There is room in the middle of them for whoever jumps.' };
+    if (this.handK > 0.98 && h > TOP - 1) return { key: 'hand', line: 'It is holding its hand out, level with the roof.' };
     if (this.hearted && h > TOP - 1) return { key: 'roofframe', line: 'The frame on the roof leads back to the gallery.' };
     if (this.flung && !this.hearted && h > 60 && near(this.giant.at, 30)) return { key: 'ear', line: 'Its ear is open. There is a light in it.' };
     if (h > TOP - 1) return { key: 'beam', line: 'There is a beam out of the needle, over everything. The steps go round to it.' };
@@ -940,8 +948,8 @@ export class Dunes {
   /** How high the sand is where it stands; and where the middle of the tower is, halfway up. */
   get giantSand() { return this.giant.at.y; }
   get axis() { return this._axis || (this._axis = { x: ax(40), z: az(40) }); }
-  save() { return { done: this.done ? 1 : 0, open: this.open ? 1 : 0, asked: this.asked ? 1 : 0, heart: this.hearted ? 1 : 0 }; }
-  load(d) { this.done = !!(d && d.done); this.giant.T = -1; if (this.done) this.wake(true); this.hearted = !!(d && d.heart); this.works.setPainted(this.hearted); this.open = !!(d && (d.open || d.done)); this.asked = !!(d && d.asked); }          // (a journey saved before there was a gate, and already past it, finds it open)
+  save() { return { done: this.done ? 1 : 0, open: this.open ? 1 : 0, asked: this.asked ? 1 : 0, heart: this.hearted ? 1 : 0, dug: this.life.dug }; }
+  load(d) { this.done = !!(d && d.done); this.giant.T = -1; if (this.done) this.wake(true); this.hearted = !!(d && d.heart); this.works.setPainted(this.hearted); this.life.dug = d && d.dug; this.open = !!(d && (d.open || d.done)); this.asked = !!(d && d.asked); }          // (a journey saved before there was a gate, and already past it, finds it open)
 
   update(dt, t, player, camera) {
     const ev = this.events.splice(0), here = !!player && this.contains(player.pos);
@@ -1043,7 +1051,7 @@ export class Dunes {
     {
       const G = this.giant, w = ev.find((e) => e.type === 'worm'), sh = G.k >= 1 ? this._sh || (this._sh = [new V3(), new V3()]) : null;
       if (sh) { sh[0].set(-2.75 * 7.5, 10.25 * 7.5, 0).applyMatrix4(G.root.matrixWorld); sh[1].set(2.75 * 7.5, 10.25 * 7.5, 0).applyMatrix4(G.root.matrixWorld); }
-      this.life.update(dt, t, player, { day: this.day, night, below: this.below, worm: w ? w.d : null, shoulders: sh }, ev);
+      this.life.update(dt, t, player, { day: this.day, night, below: this.below, worm: w ? w.d : null, shoulders: sh, eye: camera.position }, ev);
     }
 
     // ---- the one under the sand: asleep, it is a head lying in it. Awake: its eyes open, its head comes round to the
@@ -1055,6 +1063,7 @@ export class Dunes {
       G.root.position.set(G.at.x, G.y0 + (G.y1 - G.y0) * k, G.at.z);
       G.root.rotation.x = 0.1 * Math.sin(Math.PI * k); G.root.rotation.z = 0.02 * Math.sin(T * 1.3) * Math.sin(Math.PI * k);
       G.arms.forEach((a, i) => { a.rotation.x = -0.5 * Math.sin(Math.PI * k); a.rotation.z = (i ? 1 : -1) * 0.14 * Math.sin(Math.PI * k); });
+      { this.handK += clamp((this.hearted && !this.inWorks && k >= 1 ? 1 : 0) - this.handK, -dt / 5, dt / 5); const e = smooth(this.handK); G.arms[0].rotation.x += this.held[0] * e; G.arms[0].rotation.y = this.held[1] * e; }
       for (const { e, g } of G.eyes) { e.visible = open > 0.01; e.scale.y = Math.max(0.01, open); g.material.opacity = open * (0.8 + 0.12 * Math.sin(t * 2.3)); }
       if (T < 0) G.hd.quaternion.copy(G.rest);
       else {

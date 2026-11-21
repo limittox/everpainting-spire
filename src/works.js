@@ -127,6 +127,23 @@ export class Works {
       this.light = new THREE.Mesh(new THREE.CircleGeometry(4.6, 24), new THREE.MeshBasicMaterial({ color: 0xa8f0ff, transparent: true, opacity: 0, fog: false })); this.light.position.set(x + 0.15, y, 0); this.light.rotation.y = -Math.PI / 2; root.add(this.light);
       this.blue = lamp(x - 1, y, 0, 26, 0x7fe0ff, 0); this.doorAt = new V3(C.x + x - 2, C.y + FLOOR, C.z + Math.sin(a));
     }
+    // ---- a second way, and a way back up. A great rod with a round plate on it goes up and down between the floor and one
+    // of the wheels: it is a lift for whoever stands on the plate. And beside the ledge at the top a column of steam goes
+    // up from the floor: whoever jumps into it and opens their cloak is carried up the whole height of the place.
+    {
+      const a = 3.5, x = Math.cos(a) * 20.5, z = Math.sin(a) * 20.5, b = new Bag();
+      b.add(daub(cyl(3, 3, 0.6, 16, 0, -0.3, 0), BRASS, { scale: 0.3, spread: 0.7 })); b.add(daub(cyl(0.9, 0.9, 24, 10, 0, -12.6, 0), GILT, { scale: 0.3 })); b.add(daub(place(new THREE.TorusGeometry(2.7, 0.14, 5, 20), 0, 0.03, 0, Math.PI / 2), IRON, { scale: 0.3 }));
+      for (let i = 0; i < 6; i++) b.add(daub(cyl(0.26, 0.26, 0.3, 6, Math.cos(i * 1.047) * 2.1, 0.1, Math.sin(i * 1.047) * 2.1), GILT, { scale: 0.4 }));
+      this.lift = { m: mesh(b), x: C.x + x, z: C.z + z, y: FLOOR + 0.2 }; this.lift.m.position.set(x, this.lift.y, z); root.add(this.lift.m);
+      add(cyl(1.5, 1.7, 1.2, 12, x, FLOOR + 0.2, z), IRON);
+      decks.push((px, pz) => ((px - this.lift.x) ** 2 + (pz - this.lift.z) ** 2 < 9 ? C.y + this.lift.y : null));
+      const va = 2.82, vx = Math.cos(va) * 20.6, vz = Math.sin(va) * 20.6;
+      add(cyl(2.4, 2.8, 0.5, 14, vx, FLOOR + 0.25, vz), IRON); add(place(new THREE.TorusGeometry(2.3, 0.2, 5, 20), vx, FLOOR + 0.55, vz, Math.PI / 2), GILT);
+      this.vent = { x: C.x + vx, z: C.z + vz };
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(48 * 3), 3));
+      this.steam = new THREE.Points(g, new THREE.PointsMaterial({ map: world.glowTex, size: 3.2, color: 0xf2ead8, transparent: true, opacity: 0.32, depthWrite: false, fog: false })); this.steam.frustumCulled = false; this.steam.position.set(vx, 0, vz); root.add(this.steam);
+      lamp(vx, FLOOR + 2.5, vz, 9, 0xfff0d0, 0.35);
+    }
     root.add(mesh(fixed));
     this.entry = new V3(C.x - 14.6, C.y, C.z); this.entryHeading = Math.PI / 2;          // (on the ledge, facing in)
   }
@@ -135,6 +152,8 @@ export class Works {
   inside(p) { return p.x > this.C.x - 300; }
   /** Where to go: down to the heart; and once it is red, to the door. */
   goal() { return this.painted ? this.doorAt : this.heartAt; }
+  /** How fast the air is rising here: only in the column of steam. */
+  thermal(p) { return (p.x - this.vent.x) ** 2 + (p.z - this.vent.z) ** 2 < 2.8 * 2.8 && p.y < this.C.y + 4 ? 13 * clamp((this.C.y + 4 - p.y) / 5, 0, 1) : 0; }
   /** The heart is painted, or (of a journey begun again) is not. */
   setPainted(on) { this.painted = !!on; this.red = on ? 1 : 0; this.since = on ? 1e3 : 0; this.tint = null; }
 
@@ -143,6 +162,7 @@ export class Works {
     const y = p.y - this.C.y, d = Math.hypot(p.x - this.C.x, p.z - this.C.z);
     if (y < FLOOR + 4 && this.painted) return { key: 'heartdone', line: 'It beats. The round door in its chest is open.' };
     if (y < FLOOR + 4 && d < 13) return { key: 'heart', loud: true, line: 'Its heart. Everything in here turns but this, and this has no colour at all.' };
+    if (y < FLOOR + 4 && Math.hypot(p.x - this.vent.x, p.z - this.vent.z) < 9) return { key: 'steam', line: 'Steam goes up here, all the way to the top. It would carry an open cloak.' };
     if (y > -3) return { key: 'works', line: 'Inside, it is all wheels. They go down, and they will carry whoever stands on them.' };
     return null;
   }
@@ -170,6 +190,9 @@ export class Works {
     this.axle.rotation.y += 0.22 * step;
     for (const w of this.wall) w.m.rotation.y += w.w * step;
     for (const r of this.rods) r.m.position.y = r.y + Math.sin(this.ph * 1.7 + r.ph) * 1.6;
+    // the lift: slowly up to the eighth wheel and slowly down again, resting a moment at each end; and the steam
+    { const u = clamp(0.5 - 0.72 * Math.cos(this.ph * 0.3), 0, 1), e = u * u * (3 - 2 * u); this.lift.y = FLOOR + 0.2 + (20 - 0.2) * e; this.lift.m.position.y = this.lift.y; }
+    { const sp = this.steam.geometry.attributes.position; for (let i = 0; i < 48; i++) { const u = (t * 0.22 + i / 48) % 1, a = i * 2.4 + t * 0.6; sp.setXYZ(i, Math.cos(a) * (0.6 + u * 1.3), FLOOR + 0.6 + u * (4 - FLOOR), Math.sin(a) * (0.6 + u * 1.3)); } sp.needsUpdate = true; }
     // the wall is in the way all round, and so is the floor of the place: nobody leaves it but by a door
     { const dx = p.x - C.x, dz = p.z - C.z, d = Math.hypot(dx, dz); if (d > R - 0.9) { p.x = C.x + (dx / d) * (R - 0.9); p.z = C.z + (dz / d) * (R - 0.9); } }
     if (player.grounded) this.safe.copy(p);
