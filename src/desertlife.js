@@ -38,6 +38,12 @@ export class DesertLife {
     const glow = (p, size, color, op = 0) => { const q = glowSprite(world.glowTex, size, color, op); q.position.copy(p); root.add(q); return q; };
     const points = (n, size, color, additive = true) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); const m = new THREE.Points(g, new THREE.PointsMaterial({ map: world.glowTex, size, color, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending })); m.frustumCulled = false; root.add(m); return m; };
 
+    // ---- what anything with a body is made of here: rounded pieces, as the painter is. A ball, a rod, a cone; and a limb, from one joint to the next.
+    const mats = {}, M = (c) => mats[c] || (mats[c] = new THREE.MeshLambertMaterial({ color: c, emissive: 0x120d08 }));
+    const put = (parent, geo, c, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => { const m = new THREE.Mesh(geo, typeof c === 'number' ? M(c) : c); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.scale.set(sx, sy, sz); parent.add(m); return m; };
+    const ball = (r) => new THREE.SphereGeometry(r, 12, 9), rod = (r0, r1, h, n = 9) => new THREE.CylinderGeometry(r0, r1, h, n), cone = (r, h, n = 9) => new THREE.ConeGeometry(r, h, n);
+    const limb = (parent, a, b, ra, rb, c) => { const m = new THREE.Mesh(rod(rb, ra, a.distanceTo(b)), M(c)); m.position.copy(a).lerp(b, 0.5); m.quaternion.setFromUnitVectors(new V3(0, 1, 0), b.clone().sub(a).normalize()); parent.add(m); return m; };
+
     // ================================================================= the camp, on the shore of the oasis that is not there
     const K = L(env.oasis[0] - 30, env.oasis[1] + 30);
     {
@@ -108,15 +114,33 @@ export class DesertLife {
 
     // ================================================================= creatures
     const critter = (color, parts) => { const g = new THREE.Group(), mat = flat(color); for (const [w, h, d, x, y, z] of parts) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); g.add(m); } root.add(g); return g; };
-    // lizards: basking, until somebody comes too near
+    // lizards: basking, until somebody comes too near (a long body, a head with two eyes, a tail, four feet splayed)
+    const lizard = (c) => {
+      const g = new THREE.Group();
+      put(g, ball(0.1), c, 0, 0.06, 0, 0, 0, 0, 0.8, 0.5, 2.3); put(g, ball(0.075), c, 0, 0.075, 0.27, 0, 0, 0, 0.9, 0.7, 1.3); put(g, cone(0.05, 0.6, 6), c, 0, 0.045, -0.5, -Math.PI / 2);
+      for (const [x, z] of [[1, 0.13], [-1, 0.13], [1, -0.12], [-1, -0.12]]) put(g, ball(0.035), c, x * 0.14, 0.03, z, 0, 0, 0, 2.2, 0.6, 0.8);
+      for (const k of [-1, 1]) put(g, ball(0.014), 0x1a1410, k * 0.045, 0.11, 0.31);
+      g.scale.setScalar(1.6); root.add(g); return g;
+    };
     this.lizards = [[-5, 38, 0], [9, 24, 0], [-16, 30, 0], [20, 40, 0], [3, 4, 0], [-24, 8, 0], [30, 18, 0], [env.oasis[0] - 36, env.oasis[1] + 10, 1], [env.oasis[0] - 20, env.oasis[1] + 34, 1], [env.oasis[0] + 8, env.oasis[1] - 22, 1], [80, 198, 1], [96, 172, 1]]
-      .map(([dx, dz, lowland], i) => ({ g: critter([0x7a8a4a, 0x9a8450, 0x6a7a58][i % 3], [[0.16, 0.08, 0.5, 0, 0.05, 0], [0.12, 0.07, 0.16, 0, 0.06, 0.32], [0.06, 0.05, 0.5, 0, 0.04, -0.45], [0.42, 0.03, 0.06, 0, 0.03, 0.15], [0.42, 0.03, 0.06, 0, 0.03, -0.12]]), x: X0 + dx, z: Z0 + dz, low: !!lowland, run: 0, dir: i * 1.3, mark: 0 }));
+      .map(([dx, dz, lowland], i) => ({ g: lizard([0x7a8a4a, 0x9a8450, 0x6a7a58][i % 3]), x: X0 + dx, z: Z0 + dz, low: !!lowland, run: 0, dir: i * 1.3, mark: 0 }));
     // beetles: going about their business, slowly
     this.beetles = [[K.x + 3, K.z + 2], [K.x - 6, K.z - 4], [K.x + 9, K.z + 5], [X0 + 20, Z0 + 470], [X0 + 2, Z0 + 556], [X0 + 86, Z0 + 196], [X0 + env.oasis[0] - 5, Z0 + env.oasis[1] + 8], [X0 + env.oasis[0] + 6, Z0 + env.oasis[1] - 9]]
       .map(([x, z], i) => ({ g: critter(0x2a2420, [[0.2, 0.12, 0.28, 0, 0.07, 0], [0.12, 0.08, 0.1, 0, 0.06, 0.18]]), x, z, dir: i * 2.3, turn: i * 0.7, mark: 0 }));
+    // (sat up: haunches, an upright chest with a white bib, straight forelegs, a head with a pointed muzzle and tall ears, and its tail curled round it, white at the tip)
+    const fox = () => {
+      const g = new THREE.Group(), F = 0xc8793a, WH = 0xf4e8d0, DK = 0x3a2a22;
+      put(g, ball(0.3), F, 0, 0.36, -0.12, 0, 0, 0, 0.95, 1.05, 1.25); put(g, ball(0.24), F, 0, 0.62, 0.16, 0, 0, 0, 0.9, 1.25, 0.95); put(g, ball(0.16), WH, 0, 0.56, 0.3, 0, 0, 0, 0.8, 1.2, 0.6);
+      for (const k of [-1, 1]) { put(g, rod(0.055, 0.045, 0.5), F, k * 0.11, 0.26, 0.3); put(g, ball(0.06), DK, k * 0.11, 0.03, 0.33, 0, 0, 0, 1, 0.6, 1.4); put(g, ball(0.1), F, k * 0.2, 0.14, -0.02, 0, 0, 0, 1, 0.8, 1.6); }
+      const h = new THREE.Group(); h.position.set(0, 0.98, 0.26); g.add(h);
+      put(h, ball(0.17), F, 0, 0, 0, 0, 0, 0, 1.05, 0.95, 1); put(h, cone(0.085, 0.24, 8), F, 0, -0.04, 0.2, Math.PI / 2); put(h, ball(0.03), DK, 0, -0.03, 0.32); put(h, ball(0.1), WH, 0, -0.09, 0.1, 0, 0, 0, 1.1, 0.6, 1.1);
+      for (const k of [-1, 1]) { put(h, cone(0.075, 0.2, 4), F, k * 0.1, 0.18, -0.02, 0, 0, k * -0.2); put(h, cone(0.04, 0.12, 4), DK, k * 0.1, 0.24, -0.02, 0, 0, k * -0.2); put(h, ball(0.022), DK, k * 0.075, 0.03, 0.14); }
+      put(g, ball(0.16), F, 0.28, 0.2, -0.42, 0, 0.6, 0, 0.8, 0.8, 2.2); put(g, ball(0.11), WH, 0.5, 0.2, -0.72, 0, 0.6, 0, 0.8, 0.8, 1.4);
+      root.add(g); return g;
+    };
     // a fox: on a crest, watching; gone over it when come near; and then on another crest, further on
-    this.fox = { g: critter(0xc8793a, [[0.42, 0.5, 1.2, 0, 0.62, 0], [0.36, 0.36, 0.42, 0, 1.0, 0.72], [0.1, 0.22, 0.08, -0.12, 1.28, 0.74], [0.1, 0.22, 0.08, 0.12, 1.28, 0.74], [0.16, 0.14, 0.26, 0, 0.94, 1.0], [0.22, 0.22, 0.9, 0, 0.6, -1.0], [0.12, 0.5, 0.12, -0.14, 0.25, 0.42], [0.12, 0.5, 0.12, 0.14, 0.25, 0.42], [0.12, 0.5, 0.12, -0.14, 0.25, -0.42], [0.12, 0.5, 0.12, 0.14, 0.25, -0.42]]), spots: [[-58, 522], [-92, 404], [172, 306], [-44, 246], [128, 520]], at: 0, run: 0, gone: false, x: 0, z: 0, dir: 0 };
-    this.fox.g.children[5].material = flat(0xf0e2c0); this.fox.g.scale.setScalar(1.35); this.fox.x = X0 + this.fox.spots[0][0]; this.fox.z = Z0 + this.fox.spots[0][1];
+    this.fox = { g: fox(), spots: [[-58, 522], [-92, 404], [172, 306], [-44, 246], [128, 520]], at: 0, run: 0, gone: false, x: 0, z: 0, dir: 0 };
+    this.fox.g.scale.setScalar(1.5); this.fox.x = X0 + this.fox.spots[0][0]; this.fox.z = Z0 + this.fox.spots[0][1];
     // a flock: sat on a dune by where the worm comes out, and later on the shoulders of the one that woke; up when either stirs
     this.birds = Array.from({ length: 14 }, (_, i) => {
       const g = new THREE.Group(), mat = flat(0xf4ecd8, { side: THREE.DoubleSide }), w = [-1, 1].map((k) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.42).translate(k * 0.45, 0, 0).rotateX(-Math.PI / 2), mat); g.add(m); return m; });
@@ -124,23 +148,48 @@ export class DesertLife {
       return { g, w, ph: i * 0.83, r: 14 + (i % 5) * 4, h: 12 + (i % 4) * 3.5, sp: (i % 2 ? 1 : -1) * (0.5 + (i % 3) * 0.12), roost: new V3() };
     });
     this.air = 0; this.perchAt = L(96, 500, 0.2);
+    // (a beast of burden: a long body and a hump, a neck reaching forward to a small head, four thin legs, a load roped on; and a walker in a robe, with a staff)
+    const beast = () => {
+      const g = new THREE.Group(), C1 = 0x5a4430, C2 = 0x3a2c20;
+      put(g, ball(1.3), C1, 0, 4.6, 0, 0, 0, 0, 0.8, 0.85, 1.8); put(g, ball(0.9), C1, 0, 5.7, -0.2, 0, 0, 0, 0.8, 0.9, 0.9);
+      limb(g, new V3(0, 5.0, 1.9), new V3(0, 7.2, 2.9), 0.5, 0.32, C1); put(g, ball(0.5), C1, 0, 7.4, 3.3, 0, 0, 0, 0.75, 0.7, 1.4);
+      for (const [x, z] of [[-0.5, 1.5], [0.5, 1.5], [-0.5, -1.5], [0.5, -1.5]]) limb(g, new V3(x, 4.0, z), new V3(x, 0, z), 0.3, 0.18, C2);
+      put(g, new THREE.BoxGeometry(2.4, 1.0, 1.6), 0x7a3a30, 0, 5.3, -1.3); for (const k of [-1, 1]) put(g, ball(0.6), 0x8a6a40, k * 1.2, 4.9, -1.2);
+      limb(g, new V3(0, 4.9, -2.0), new V3(0, 3.4, -2.6), 0.08, 0.05, C2);
+      return g;
+    };
+    const walker = (i) => { const g = new THREE.Group(), robe = [0x4a5a7a, 0x7a4a3a, 0x5a6a4a][i % 3]; put(g, cone(1.0, 3.4, 9), robe, 0, 1.7, 0); put(g, ball(0.5), 0xc89a6a, 0, 3.7, 0); put(g, ball(0.58), robe, 0, 3.85, -0.1, 0, 0, 0, 1, 0.85, 1); limb(g, new V3(0.9, 0, 0.4), new V3(0.9, 4.6, 0.2), 0.07, 0.06, 0x3a2c20); return g; };
     // ================================================================= far off: a caravan, going along the crests where nobody can follow
     this.caravan = Array.from({ length: 9 }, (_, i) => {
-      const beast = i % 3 !== 2, g = critter(0x4a3626, beast
-        ? [[1.6, 2.0, 4.4, 0, 4.6, 0], [1.2, 1.4, 1.6, 0, 6.2, -0.3], [0.7, 2.6, 0.8, 0, 6.0, 2.4], [0.8, 0.8, 1.6, 0, 7.4, 3.0], [0.5, 3.6, 0.5, -0.5, 1.8, 1.6], [0.5, 3.6, 0.5, 0.5, 1.8, 1.6], [0.5, 3.6, 0.5, -0.5, 1.8, -1.6], [0.5, 3.6, 0.5, 0.5, 1.8, -1.6], [2.2, 1.2, 1.8, 0, 5.6, -1.2]]
-        : [[1.0, 2.6, 0.8, 0, 2.3, 0], [0.7, 0.8, 0.7, 0, 4.0, 0], [0.4, 1.0, 0.4, -0.25, 0.5, 0], [0.4, 1.0, 0.4, 0.25, 0.5, 0], [0.12, 4.4, 0.12, 0.7, 2.4, 0.3]]);
+      const g = i % 3 !== 2 ? beast() : walker(i); root.add(g);
       return { g, off: i * 15 };
     });
     this.march = 0;
 
     // ================================================================= a traveller, sat by the fire that went out
+    // Cross-legged on a rug, in a blue robe with a darker mantle and its hood up; a grey beard, a red scarf, hands on
+    // knees, a staff with a ring and a tassel stood by them; a pack and a bedroll behind, a cup on a flat stone.
     {
-      const g = new THREE.Group(), part = (w, h, d, x, y, z, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), flat(c)); m.position.set(x, y, z); g.add(m); };
-      part(1.0, 1.0, 0.9, 0, 0.5, 0, 0x34486a); part(0.8, 0.7, 0.6, 0, 1.3, -0.02, 0x34486a); part(0.5, 0.5, 0.5, 0, 1.9, 0.02, 0xc89a6a); part(0.66, 0.5, 0.62, 0, 2.02, -0.08, 0x2a3a58);
-      part(0.22, 0.22, 0.7, -0.42, 1.0, 0.35, 0x34486a); part(0.22, 0.22, 0.7, 0.42, 1.0, 0.35, 0x34486a); part(0.1, 2.6, 0.1, 0.75, 1.3, 0.3, 0x7a5a3a); part(0.9, 0.25, 0.5, 0, 0.14, 0.62, 0x34486a);
-      const x = K.x + 0.5 + 2.4, z = K.z - 6; g.position.set(x, low(x, z), z); g.rotation.y = -Math.PI / 2; root.add(g);
-      this.traveller = { g, x, z, n: 0, away: true };
-      world.colliders.push({ x, z, r: 0.7, top: g.position.y + 2.2, late: true });
+      const g = new THREE.Group(), ROBE = 0x34507a, CLOAK = 0x26385a, SKIN = 0xc8946a, GREY = 0xb8b0a4, LEATHER = 0x7a4a34, RED = 0xb8503c, GOLD = 0xe0b860, DARK = 0x1c1612;
+      const side = (c) => new THREE.MeshLambertMaterial({ color: c, emissive: 0x120d08, side: THREE.DoubleSide });
+      put(g, new THREE.BoxGeometry(1.9, 0.04, 1.5), 0x8a3a30, 0, 0.02, 0.15); for (const z of [-0.35, 0.15, 0.65]) put(g, new THREE.BoxGeometry(1.9, 0.045, 0.1), 0xe6d4a8, 0, 0.022, z);
+      put(g, ball(0.5), ROBE, 0, 0.2, 0.14, 0, 0, 0, 1.05, 0.36, 1.0);
+      for (const k of [-1, 1]) { put(g, ball(0.17), ROBE, k * 0.42, 0.2, 0.34, 0, 0, 0, 1, 0.8, 1.2); put(g, ball(0.085), LEATHER, k * 0.15, 0.1, 0.62, 0, k * 0.5, 0, 0.9, 0.6, 1.7); }
+      const torso = new THREE.Group(); torso.position.set(0, 0.3, 0); torso.rotation.x = 0.07; g.add(torso);
+      put(torso, rod(0.2, 0.27, 0.66, 12), ROBE, 0, 0.36, 0); put(torso, new THREE.TorusGeometry(0.262, 0.035, 6, 16), LEATHER, 0, 0.12, 0, Math.PI / 2); put(torso, new THREE.BoxGeometry(0.1, 0.4, 0.04), RED, 0.08, -0.02, 0.26, 0.1);
+      put(torso, new THREE.CylinderGeometry(0.2, 0.44, 0.48, 14, 1, true), side(CLOAK), 0, 0.56, 0); put(torso, rod(0.075, 0.085, 0.12), SKIN, 0, 0.84, 0.01); put(torso, new THREE.TorusGeometry(0.13, 0.055, 7, 14), RED, 0, 0.8, 0.01, Math.PI / 2);
+      for (const k of [-1, 1]) { const sh = new V3(k * 0.25, 0.7, 0), el = new V3(k * 0.37, 0.36, 0.14), ha = new V3(k * 0.38, 0.06, 0.4); limb(torso, sh, el, 0.085, 0.07, CLOAK); limb(torso, el, ha, 0.07, 0.055, ROBE); put(torso, ball(0.06), SKIN, ha.x, ha.y, ha.z + 0.02); }
+      const head = new THREE.Group(); head.position.set(0, 1.03, 0.03); torso.add(head);
+      put(head, ball(0.185), SKIN, 0, 0, 0, 0, 0, 0, 1, 1.08, 1);
+      put(head, new THREE.SphereGeometry(0.24, 14, 10, 0, TAU, 0, 1.95), side(CLOAK), 0, 0.01, -0.035, -0.42); put(head, cone(0.1, 0.28, 8), CLOAK, 0, 0.1, -0.27, -2.2);
+      for (const k of [-1, 1]) { put(head, ball(0.022), DARK, k * 0.066, 0.02, 0.168); put(head, new THREE.BoxGeometry(0.07, 0.014, 0.02), GREY, k * 0.066, 0.065, 0.172, 0, 0, k * -0.2); }
+      put(head, ball(0.03), SKIN, 0, -0.02, 0.19, 0, 0, 0, 0.8, 1.2, 1); put(head, cone(0.115, 0.26, 9), GREY, 0, -0.2, 0.1, Math.PI + 0.25); put(head, ball(0.05), GREY, 0, -0.075, 0.165, 0, 0, 0, 1.7, 0.5, 0.8);
+      limb(g, new V3(0.5, 0, 0.52), new V3(0.36, 2.3, 0.3), 0.03, 0.024, 0x7a5a3a); put(g, new THREE.TorusGeometry(0.07, 0.016, 5, 12), GOLD, 0.36, 2.34, 0.3); put(g, cone(0.035, 0.16, 6), RED, 0.36, 2.2, 0.36, Math.PI);
+      put(g, new THREE.BoxGeometry(0.46, 0.5, 0.32), LEATHER, -0.85, 0.27, -0.25, 0, 0.3, 0.06); put(g, new THREE.BoxGeometry(0.5, 0.12, 0.36), 0x93603f, -0.85, 0.55, -0.25, 0, 0.3, 0.06); put(g, rod(0.15, 0.15, 0.6, 10), 0x8a7a5a, -0.84, 0.72, -0.24, 0, 0.3, Math.PI / 2);
+      put(g, rod(0.22, 0.26, 0.1, 9), 0x9a8a78, 0.75, 0.05, 0.75); put(g, rod(0.06, 0.045, 0.1, 8), GOLD, 0.75, 0.15, 0.75);
+      const x = K.x + 0.5 + 2.6, z = K.z - 6; g.scale.setScalar(1.3); g.position.set(x, low(x, z), z); g.rotation.y = -Math.PI / 2; root.add(g);
+      this.traveller = { g, torso, head, x, z, n: 0, away: true };
+      world.colliders.push({ x, z, r: 0.75, top: g.position.y + 2.2, late: true });
     }
     // ================================================================= a storm of sand: three shells of amber round the eye, the nearest the thinnest
     this.shells = [18, 36, 70].map((r, i) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 10), new THREE.MeshBasicMaterial({ color: 0xd9a25a, transparent: true, opacity: 0, side: THREE.BackSide, depthWrite: false, fog: false })); m.userData.op = [0.22, 0.4, 0.9][i]; m.renderOrder = 5; m.frustumCulled = false; root.add(m); return m; });
@@ -298,7 +347,7 @@ export class DesertLife {
     if ((this.snap -= dt) <= 0) { this.snap = 1.5 + Math.random() * 2.5; if (Math.hypot(p.x - this.traveller.x, p.z - this.traveller.z) < 26) ev.push({ type: 'snap' }); }
     if ((this.toll -= dt) <= 0) { this.toll = 8 + Math.random() * 6; if (down) ev.push({ type: 'faraway', n: Math.floor(Math.random() * 3) }); }
     // ---- the traveller turns their head to whoever comes; each time somebody comes back there is the next thing to say
-    { const T = this.traveller, d = Math.hypot(p.x - T.x, p.z - T.z); if (d > 13 && !T.away) { T.away = true; T.n = Math.min(T.n + 1, 3); } if (d < 7) T.away = false; T.g.children[2].rotation.y = T.g.children[3].rotation.y = d < 12 ? clamp(Math.atan2(p.x - T.x, p.z - T.z) - T.g.rotation.y, -1.1, 1.1) : 0; }
+    { const T = this.traveller, d = Math.hypot(p.x - T.x, p.z - T.z); if (d > 13 && !T.away) { T.away = true; T.n = Math.min(T.n + 1, 3); } if (d < 7) T.away = false; let a = Math.atan2(p.x - T.x, p.z - T.z) - T.g.rotation.y; a = Math.atan2(Math.sin(a), Math.cos(a)); T.head.rotation.y += ((d < 12 ? clamp(a, -1.15, 1.15) : 0) - T.head.rotation.y) * (1 - Math.exp(-4 * dt)); T.head.rotation.x = Math.sin(t * 0.7) * 0.03; T.torso.scale.y = 1 + Math.sin(t * 1.3) * 0.012; }
     // ---- the sky: its shape in the stars, once it stands and it is night; and a star falling, every so often
     this.sky.position.copy(st.eye);
     { const F = this.figure; F.k += clamp((st.shoulders && st.night > 0.5 ? 1 : 0) - F.k, -dt / 3, dt / 14); F.mat.opacity = F.k * 0.5; F.stars.forEach((s, i) => { s.material.opacity = F.k * (0.8 + 0.2 * Math.sin(t * 1.7 + i)); }); }
