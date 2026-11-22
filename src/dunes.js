@@ -914,6 +914,7 @@ export class Dunes {
     { const said = this.life.talk(p); if (said) return said; }
     const h = p.y - Y0, near = (q, r) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < r * r;
     if (this.life.near) return { key: 'glint', line: 'Something glints in the sand here. A swing of the brush would turn it up.' };
+    if (this.worm.rider >= 0) return { key: 'wormride', line: 'It will carry you round for as long as you like, over the sand and under it. Jump to let go.' };
     if (this.wormNear && this.worm.rider < 0) return { key: 'worm', line: 'Whatever it is, it takes no notice of you. Its back is broad.' };
     if (this.below) {
       if (!this.open && this.orb < 2 && near(this.foot, 30)) return { key: 'gate', loud: true, line: 'The way up is shut. It opens for whoever draws a ring round the one thing out here that is real.' };
@@ -1025,24 +1026,28 @@ export class Dunes {
       }
       if (W.puff <= 0) W.puff = 0.1;
       if (!out && W.sign <= 0) { W.sign = 0.3; const h = W.parts[0].position; ev.push({ type: 'heave', x: h.x, y: desertH(h.x, h.z) + 0.5, z: h.z, n: 4, fall: true }); }
-      // Riding it. Whoever touches a length of it that is out of the sand is taken up onto its back, and sits there, and
-      // is carried over the arch; where it goes in again they are thrown clear, forward and up (and sooner, if they jump).
+      // Riding it. Whoever touches a length of it that is out of the sand is taken up onto its back, and sits there on the
+      // ridge of its plates, and is carried: over the arch, and down, and on under the sand (where the tips of the plates
+      // still cut the surface, and the rider goes along on them), round and round, until they jump. Under the sand it can
+      // be got onto as well, by stepping in where the sand is being thrown up over the front of it.
       const w = this._w || (this._w = new V3()), over = (m) => m.position.y - desertH(m.position.x, m.position.z);
       W.cool = Math.max(0, W.cool - dt); this.wormNear = false;
       if (W.rider < 0) {
         v.set(p.x, p.y + 0.9, p.z);
         for (let i = 1; i < W.parts.length - 8; i++) {
-          const m = W.parts[i]; if (over(m) < 1) continue;
-          const d2 = m.position.distanceToSquared(v); if (d2 < 70 * 70) this.wormNear = true;
-          if (d2 < (W.R + 1.6) ** 2 && !W.cool && !player.lift && !player.seat) { W.rider = i; W.rode = 0; W.high = false; player.sit(p, player.heading); ev.push({ type: 'mount' }); break; }
+          const m = W.parts[i], under = over(m) < 1, d2 = m.position.distanceToSquared(v);
+          if (!under && d2 < 70 * 70) this.wormNear = true;
+          const touch = under ? i < 14 && (m.position.x - p.x) ** 2 + (m.position.z - p.z) ** 2 < 20 && Math.abs(p.y - desertH(p.x, p.z)) < 2.5 : d2 < (W.R + 1.6) ** 2;
+          if (touch && !W.cool && !player.lift && !player.seat) { W.rider = i; W.rode = 0; W.high = false; player.sit(p, player.heading); ev.push({ type: 'mount' }); break; }
         }
       }
       if (W.rider >= 0) {
         const m = W.parts[W.rider], above = over(m), top = v.set(0, W.R + 4, 0).applyQuaternion(m.quaternion).add(m.position), fwd = w.set(0, 0, 1).applyQuaternion(m.quaternion);
-        W.rode += dt; if (above > 12) W.high = true;
-        if (!player.seat || (W.rode > 0.5 && player.jumpBuf > 0.1) || (W.high && above < 5) || (W.rode > 1 && above < 0.5)) {
+        W.rode += dt; top.y = Math.max(top.y, desertH(top.x, top.z) + 0.6);          // (never under the sand, whatever the slope)
+        if (above < 1 && (W.puffR = (W.puffR || 0) - dt) <= 0) { W.puffR = 0.12; ev.push({ type: 'heave', x: top.x, y: top.y - 1, z: top.z, n: 5 }); this.dig(top.x, top.z, 1.6, 0.6, this.low); }          // (under the sand, the rider leaves a wake)
+        if (!player.seat || (W.rode > 0.5 && player.jumpBuf > 0.1)) {
           player.stand(); p.copy(top); player.vel.set(fwd.x * 17, 13, fwd.z * 17); player.grounded = false; player.jumps = 1; player.airTime = 1;
-          W.rider = -1; W.cool = 1.5; ev.push({ type: 'dismount' });
+          W.rider = -1; W.cool = 3; ev.push({ type: 'dismount' });
         } else { player.seat.pos.copy(top); player.seat.heading = Math.atan2(fwd.x, fwd.z); p.copy(top); }
       }
     }
