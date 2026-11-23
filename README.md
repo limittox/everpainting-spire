@@ -38,6 +38,7 @@ On a phone or tablet: the left thumb walks (a stick appears wherever it comes do
 ## What there is to do
 
 - **Paint.** Every swing lays real strokes into the ground and soaks colour into trees, rocks and walls. Flowers come up where you walk.
+- **Earn your colours.** You set out with one, Turquoise. The other seven come one at a time on the way to the Spire: one with each new island you set foot on, and one with each spark. The brush takes up each new colour as it comes.
 - **Follow the route.** Paint the sketched bridges, gather three sparks of inspiration, and reach the Spire. Each spark has a shaft of light standing over it from the first, and a small bell that sounds clearer the nearer you are; each is held by something that has to be seen to before it can be taken.
 - **Rest.** Sit at an easel and the painter paints the view in front of it. Each finished picture is yours to save.
 - **Look around.** There are sleeping companions to wake, sketches waiting to be painted into being, springs that colour their waterfalls, and a few places no path leads to.
@@ -47,7 +48,7 @@ The journey is saved in your browser as you play.
 
 ### The Underpainting
 
-The second level: a world still in pencil, where colour does things. It begins at night, and each thing you finish brings the morning closer.
+The second level: a world still in pencil, where colour does things. It begins at night, and each thing you finish brings the morning closer. You step into it with only the two colours that run. Each kind of colour is handed back as it is wanted: Leaf when the Dry Stair has its water, Gold and Ember when the way on is grown, Cream when the Kiln is lit, and the rest when it is morning. Outside it the brush has everything again.
 
 - **Water** (Turquoise or Sky): paint a dry spring and water follows its channel, turns a wheel, and the wheel works a lift to the next terrace.
 - **Growth** (Leaf): paint a sketched seed and a vine grows along the trellis drawn for it, into a bridge or a ramp.

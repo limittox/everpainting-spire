@@ -54,7 +54,8 @@ export function createHud(world) {
     /** Show the row of paints for a moment, with the loaded one enlarged. */
     palette(paints, index) {
       const el = $('swatches');
-      if (el.children.length !== paints.length) el.textContent = '';          // a new paint has been found
+      const sig = paints.map((p) => p.hex).join();
+      if (el.dataset.sig !== sig) { el.textContent = ''; el.dataset.sig = sig; }          // a paint has come, or gone, or these are another place's paints
       if (!el.children.length) for (const p of paints) { const i = document.createElement('i'); i.style.background = i.style.color = p.hex; el.appendChild(i); }
       [...el.children].forEach((c, k) => c.classList.toggle('cur', k === index));
       el.classList.add('on');

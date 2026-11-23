@@ -140,6 +140,7 @@ const game = {
   locked: false, unlocked: false,
   rest: null, lastRest: null, restT: 0, restBlend: 0, restBloom: 0, vistas: 0,     // resting at an easel
   journey: 1,      // which time through this is
+  far: 0,          // the furthest of the first five islands stood on yet (a colour comes with each: see allPaints)
   keep: [],        // paints brought along from an earlier journey
   shot: null,      // photo mode: set to take a picture of the next frame
 };
@@ -248,8 +249,8 @@ function begin() {
   document.activeElement?.blur?.();
   sound.start();
   capture();
-  if (new URLSearchParams(location.search).has('underpainting') && !under.contains(player.pos)) { enterUnder(); return; }
-  if (new URLSearchParams(location.search).has('gallery') && !gallery.contains(player.pos)) { galleryAct({ type: 'door', door: gallery.doors[0] }); return; }
+  if (new URLSearchParams(location.search).has('underpainting') && !under.contains(player.pos)) { game.all = true; enterUnder(); return; }
+  if (new URLSearchParams(location.search).has('gallery') && !gallery.contains(player.pos)) { game.all = true; galleryAct({ type: 'door', door: gallery.doors[0] }); return; }          // (started past the first islands: with every colour they give)
   const here = game.resumed ? world.islandAt(player.pos.x, player.pos.z) : null;
   setTimeout(() => (game.resumed ? hud.toast(here ? here.name : 'The Everpainting Spire', 'Where you left off') : hud.toast('Lantern Rise', game.journey > 1 ? 'The first stroke, again' : 'The first stroke')), 2800);
 }
@@ -487,7 +488,7 @@ function snapshot() {
     bridges: world.bridges.map((b) => Math.round(b.progress * 1000) / 1000),
     vistas: vistas.spots.map((v) => (v.done ? 1 : 0)),
     won: game.won, dayGoal: r2(game.dayGoal), paint: game.paint, playT: Math.round(game.playT), hints: Object.keys(game.hints),
-    journey: game.journey, keep: game.keep,
+    journey: game.journey, keep: game.keep, far: game.far,
     garden: garden.save(), strikes: painter.log, secrets: secrets.save(), sketches: sketches.save(), pieces: pieces.save(), under: under.save(), seedbed: seedbed.save(), lastpage: lastpage.save(), gallery: gallery.save(), reach: !!game.reach,
   };
 }
@@ -505,6 +506,8 @@ function restore(d) {
   (d.bridges || []).forEach((p, i) => { const br = world.bridges[i]; if (br && p > br.progress) br.set(p); });
   (d.sparks || []).forEach((taken, i) => { const sp = sparks[i]; if (sp && taken) { sp.taken = true; sp.g.visible = false; game.sparks++; } });
   player.setSparks(game.sparks);
+  // (how far along the first islands: kept; or, of a journey saved before that was, told from what was done on it)
+  game.far = Number.isInteger(d.far) ? clamp(d.far, 0, 4) : Math.max(world.bridges[0].progress >= 1 ? 1 : 0, ...sparks.map((sp, i) => (sp.taken ? i + 1 : 0)), world.bridges[3].progress >= 1 || d.won ? 4 : 0);
   (d.drops || []).forEach((taken, i) => { const dr = drops.items[i]; if (dr && taken) { dr.taken = true; dr.m.visible = false; } });
   garden.load(d.garden);
   secrets.load(d.secrets);
@@ -765,11 +768,24 @@ function wakeBlot(b) {
 }
 
 // which paint is on the brush: Q or right-click for the next one, 1-8 to pick
-const allPaints = () => PAINTS.map((p, i) => i).filter((i) => !PAINTS[i].hidden || game.keep.includes(i) || secrets.places.some((s) => s.found && s.paint === i));
+// The colours are earned. The painter sets out with one, Turquoise, and the other seven come one at a time on the way to
+// the Spire, with the seven things on it that cannot be gone round: each of the four further islands, the first time it
+// is stood on, and each of the three sparks. Whichever of those comes next brings the next colour of FIRST. (The three
+// paints of the hidden places are found there, as they always were.)
+const FIRST = [2, 0, 1, 3, 5, 6, 7, 4];          // Turquoise; then Rose, Gold, Violet, Ember, Sky, Leaf, Cream
+const earned = () => (game.all ? FIRST.length : Math.min(FIRST.length, 1 + game.far + game.sparks));
+const found = (i) => game.keep.includes(i) || secrets.places.some((s) => s.found && s.paint === i);
+const allPaints = () => PAINTS.map((p, i) => i).filter((i) => (PAINTS[i].hidden ? found(i) : FIRST.indexOf(i) < earned()));
 const spare = () => allPaints().filter((i) => i !== 4);          // everything but Cream: what can be taken from the painter
+// The Underpainting gives the brush back a kind of colour at a time, as each is wanted: at first only the two that run;
+// one that grows once the Dry Stair has its water; the ones that burn once the way on is grown; Cream once the Kiln is
+// lit; and everything else when it is morning there. (Outside it the brush has all it ever had.)
+const STAGE = { 2: 0, 6: 0, 7: 1, 1: 2, 5: 2, 10: 2, 4: 3 };
+const underStage = () => (lastpage.done ? 4 : seedbed.lit ? 3 : seedbed.grown ? 2 : under.done ? 1 : 0);
 // (inside Three Tubes the brush has only what the picture was painted with: red, yellow, blue, and Cream)
 const palette = () => {
   const gone = spare().slice(0, gallery.taken), mine = allPaints().filter((i) => !gone.includes(i));
+  if (under.contains(player.pos)) { const st = underStage(); return PAINTS.map((p, i) => i).filter((i) => (!PAINTS[i].hidden || found(i)) && !gone.includes(i) && (STAGE[i] ?? 4) <= st); }
   return tubes.contains(player.pos) && !gallery.ended ? mine.filter((i) => TUBES.includes(i)) : mine;
 };
 function setPaint(i, quiet = false) {
@@ -1360,6 +1376,20 @@ function updatePlay(dt, t) {
   if (game.playT > 24) hint('skate', T ? 'Hold Skate to skate across the paint' : 'Hold Shift to skate across the paint');
   if (game.playT > 35) hint('glide', T ? 'Jump &nbsp;·&nbsp; keep it held in the air to glide' : 'Space to jump &nbsp;·&nbsp; hold it in the air to glide');
   if (game.playT > 50) hint('map', T ? 'The button at the top opens the settings' : 'Press H if you ever want the map &nbsp;·&nbsp; Esc for settings');
+
+  // the brush's colours. A new island of the first five brings one; so does a spark, and each stage of the Underpainting.
+  // When one comes the brush takes it up at once, so that it is seen to have come. Stepping into a place with colours
+  // of its own, or out of one, only puts the brush right, and says nothing.
+  if (player.grounded && player.lastIsland <= 4 && player.lastIsland > game.far) { game.far = player.lastIsland; saveSoon(); }
+  {
+    const n = earned(), st = under.contains(player.pos) ? underStage() : -1;          // (how many of the first eight; and which stage of the Underpainting, if in it)
+    if (game.earnedN !== undefined && n > game.earnedN && st < 0) {
+      setPaint(FIRST[n - 1]); cheerAll();
+      hint('newpaint', PAINTS[FIRST[n - 1]].name + ' is on the brush now.' + (touch.on ? '' : ' ' + binds.name('next') + ' or the right mouse button changes colour.'), 7500);
+    } else if (game.stageN >= 0 && st > game.stageN && st < 4) { const got = palette().find((i) => STAGE[i] === st); if (got !== undefined) { setPaint(got); cheerAll(); } }
+    else if (game.stageN !== undefined && st !== game.stageN) setPaint(game.paint, true);
+    game.earnedN = n; game.stageN = st;
+  }
 
   // island name cards
   if (player.grounded && player.lastIsland !== game.shownIsland && player.lastIsland !== undefined) {

@@ -11,6 +11,8 @@ What still needs adding, changing or fixing. Finished items are deleted, not tic
 
 ## Change
 
+- (noted) Earned colours: nothing in the world hands a colour over. It simply arrives, with a burst, a chime and its swatch, when an island is first stood on or a spark is taken. The Sunken Tower and the gallery do not earn theirs: the brush has everything there.
+- (noted) Earned colours in the Underpainting: Cream is held back until the Kiln is lit, so ground warmed on the Seedbed cannot be cooled again before then. Sunfire, if it was found, is held back with the other colours that burn.
 - (noted) After the portrait, these now keep their colour with the brush's own strokes: a painted bridge, a vine, a sketch brought to life, the pool and stream of a painted spring, and the companions that are awake. Still grey with the rest: the falling water of a painted spring, the water, kiln and wells of the Underpainting, and whatever the other pictures colour for themselves.
 - (noted) The Sunken Tower: the hand of the one that wakes does not set the painter down anywhere. At the top it lets them go on a jump, to glide where they like, or brings them back if they wait. Its elbow stays straight while it carries.
 - (noted) The Sunken Tower: inside the one that wakes, each wheel on the great axle now turns a small wheel beside it, but the small wheels turn nothing further, and cannot be stood on.
@@ -24,6 +26,9 @@ Nothing known to be broken.
 ## Check by hand
 
 Built and tested by script and still pictures only; nobody has played these yet.
+
+- Earned colours, the first islands: setting out with Turquoise alone, and a colour coming with each island and each spark (seven of the eight were stepped through by script; the third spark was not taken). How it feels: whether one colour is too few to begin with, whether the brush changing colour by itself is welcome, and the line that names the first one. An old save: whether it comes back with the colours its progress has earned (worked out from bridges and sparks; not tried with a real save).
+- Earned colours, the Underpainting: stepping in with Turquoise and Sky only, then Leaf, then Gold and Ember, then Cream, then all of them, and all of them again outside. Stepped through by script by marking each island finished; not played, so not checked that each colour really is in hand by the time its puzzle is reached on foot.
 
 - The keys: the eight new ones in the settings (sketchbook, photo, map, sound, the four arrows), and the hints and the photo bar naming whatever was chosen. A controller: its row appearing in the settings when it is plugged in, choosing a button, and leaving the title with A or Start. All of this was tried with a pretend controller only; no real one was plugged in. With a controller alone the sound may not start until a key or the mouse is pressed.
 - The Underpainting: the three new pencilled sleepers, on the Seedbed, the Kiln and the Blank Page. Seen in stills; one was woken with a swing. Whether a swing meant for one of them also does something unwanted nearby (warm ground on the Seedbed, a well on the Blank Page).
