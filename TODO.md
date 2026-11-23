@@ -5,19 +5,16 @@ What still needs adding, changing or fixing. Finished items are deleted, not tic
 
 ## Add
 
-- (asked) After the portrait, in the black-and-white world, the painter's own strokes should be the only colour. Needs a paint mask in the post-process; with only Cream left it would show nothing as things stand.
-- (noted) Key remapping in the settings panel.
-- (noted) The Underpainting: companions that hold a colour somewhere in the level. Deferred when level two was finished.
+- (noted) The keys that are not in the settings panel yet: sketchbook, photo, map, sound, and looking with the arrows. A controller's buttons cannot be changed either, and the title screen still needs a click or a key with one.
+- (noted) The Underpainting has two sleeping companions now, both on the Dry Stair. The Seedbed, the Kiln and the Blank Page have none.
 
 ## Change
 
-- (noted) The Sunken Tower: while the gate is shut, the first stretch of the chain is closed from the sides by a wall that cannot be seen. Something visible there (the light carried along the rails) would be more honest.
-- (noted) The Sunken Tower: the mesas, the two great heads and the buried figure down in the open desert still have one rough circle each to walk into. The stone on the island is fitted to its shape now; these are not.
-- (noted) The Sunken Tower: inside the one that wakes, the workings are a first version: one shaft, a stair of eleven wheels, an axle, wall wheels, rods, pipes. More could turn and mesh, and there is only one way down. There is also no way back up from the bottom before the heart is painted.
-- (noted) The Sunken Tower: the worm keeps one fixed round and leaves no ridge in the sand over it, only thrown sand. Riding it, the painter sits with eyes half shut (the resting pose); a pose of its own would be better.
-- (noted) The held-out hand only stays there: it does not carry the painter anywhere. The wheels inside still do not mesh tooth to tooth.
-- (noted) The Sunken Tower: the one that wakes comes straight up and stands; its arms and legs do not climb. Its legs are two plain drums to walk into, and the space between them is open.
-- (noted) The Sunken Tower: from the chain, the nearest mesa reads as a plain leaning cylinder. It wants some shape.
+- (noted) After the portrait, only what the brush itself laid keeps its colour: strokes on the ground of an island, and paint soaked into trees, rocks and walls. What a level colours in its own way (a painted bridge, a spring, a vine, a sketch brought to life, the companions) goes grey with the rest.
+- (noted) The Sunken Tower: the one that wakes has no elbows or knees, so its climb is whole arms and whole legs swinging. Its hand lifts the painter and brings them back; it does not set them down anywhere else.
+- (noted) The Sunken Tower: inside the one that wakes, the wheels on the great axle still turn on their own and drive nothing. The stair wheels and the wall wheels do mesh.
+- (noted) The Sunken Tower: the worm swings wider and narrower from round to round, but always about the same middle. It never leaves its ring, and takes no notice of the painter.
+- (noted) The Sunken Tower: the rocks in the open desert have no floor on top. Nothing reaches that high yet.
 
 ## Fix
 
@@ -27,19 +24,24 @@ Nothing known to be broken.
 
 Built and tested by script and still pictures only; nobody has played these yet.
 
+- After the portrait: the painter's strokes as the only colour. Seen in one still on the first island with the grey world forced on; not seen at the real ending, in the gallery or in the other pictures. The first swing on each island may hitch for a moment (its ground is told about the mark then).
+- The keys in the settings: changing one with a real key press, two keys changing places, and the prompts and hints naming the new key.
+- The Underpainting's two pencilled sleepers: waking one with a real swing, the colour it keeps, and whether it follows into the other places like the rest.
 - The Sunken Tower: how the slide down the hill feels, and whether the speed is right.
 - The Sunken Tower: the oasis water shimmering and coming apart as it is approached (only ever seen in stills).
 - The Sunken Tower: the chain's blue tiles: the rising chime, the flash, and how the building speed feels.
-- The Sunken Tower: the gate at the chain: whether the line and the picture in the gate are enough to send a player to the palms, how the lit track and the spark at the shoulder look in motion, and the sounds.
-- The Sunken Tower: walking into and standing on the island's stone (statues, pillars, fallen drums, the hand, the great head), and walking into the drum on the tower from its platform.
+- The Sunken Tower: the gate at the chain: whether the line and the picture in the gate are enough to send a player to the palms, how the lit track and the spark at the shoulder look in motion, the light along the two rails while it is shut, and the sounds.
+- The Sunken Tower: every block of stone is now in the way as a block, with its own four sides, where it used to be a row of drums: walking into and standing on the statues, pillars, fallen drums, the hand, the great head, and the legs and feet of the one that wakes. One check by script of 37 blocks left the painter inside one of them for a frame.
+- The Sunken Tower: the rocks in the open desert (their new shape up close, walking into them and the pillars beside them), the great head and the seated figure out there.
 - The first islands: landing on the Spire's roofs, since the rule for what counts as "above" a thing changed for everything with a top.
-- The Sunken Tower: the one under the sand waking after the look-out: how the rise reads in motion (the dust, the shake, the pace), the sounds, skipping it with E or Space, and how it looks from the sand in daylight.
+- The Sunken Tower: the one under the sand waking after the look-out: how the climb reads in motion (three heaves, an arm at a time, then a knee at a time), whether a raised arm ever crosses the camera, the dust, the shake, the sounds, skipping it with E or Space, and how it looks from the sand in daylight.
 - The Sunken Tower: the hoops on the roof (still at first, turning once the one under the sand stands), jumping into them and being thrown onto its right shoulder; and walking about on it, under it and into it.
-- The Sunken Tower: inside the one that wakes: finding the ear from the shoulder, riding the wheels down, painting the heart with a real swing and a real red, the door, the blue beam back to the roof, and the gallery frame appearing there. And the look of its new detail up close.
-- The Sunken Tower: the worm in the open desert: how the arch reads in motion from the hill and from close by, its mouth seen from in front, the sand it throws up, the rumble, and how it looks at night from the island.
+- The Sunken Tower: inside the one that wakes: finding the ear from the shoulder, riding the wheels down, the little wheels driving them (and standing on one), painting the heart with a real swing and a real red, the door, the blue beam back to the roof, and the gallery frame appearing there.
+- The Sunken Tower: the held-out hand: stepping onto it from the roof, being lifted, the view from up there, jumping to be brought back, and stepping off again.
+- The Sunken Tower: the worm in the open desert: how the arch reads in motion from the hill and from close by, its mouth seen from in front, the sand it throws up, the ridge it leaves, the rumble, and how it looks at night from the island. Over many rounds: whether its wider rounds ever take it through the bells, the fox or anything else standing near its ring.
 - The Sunken Tower: everything in desertlife.js. Seen in stills or checked by numbers only: the camp, the arches, the bells ringing, a jar going over, a lizard running, the fox leaving, the lanterns lighting. Not seen at all: the sand off the crests and the weeds in motion, the caravan, the flock (on the dune and on the giant), the moths, the fireflies, the windows in the rocks, and all the sounds.
-- The Sunken Tower: riding the worm: catching it by walking or sliding into it (out of the sand, or under it at its front), staying on over the arch and under the sand, jumping off with Space and gliding, and the sounds.
-- The second batch, checked by numbers and one or two stills only: digging things up with a real swing; the storm in motion and its push; the traveller’s four lines; the camera coming in when looking up from the ground (and whether it ever jitters); the lift inside. Not checked at all: rising in the steam column (jump, then hold), stepping onto the held-out hand from the roof, falling stars and the shape in the stars, the wind, flags and far bells, and a controller (none was plugged in; the title screen still needs a click or a key).
+- The Sunken Tower: riding the worm: catching it by walking or sliding into it (out of the sand, or under it at its front), staying on over the arch and under the sand, the riding pose, jumping off with Space and gliding, and the sounds.
+- The second batch, checked by numbers and one or two stills only: digging things up with a real swing; the storm in motion and its push; the traveller’s four lines; the camera coming in when looking up from the ground (and whether it ever jitters); the lift inside. Not checked at all: rising in the steam column (jump, then hold), falling stars and the shape in the stars, the wind, flags and far bells, and a controller (none was plugged in).
 - The remade figures: the traveller and the fox were seen in stills; the lizards and the caravan (beasts and walkers) were remade the same way and have not been looked at. The beetles, the flock and the buried finds are still simple blocks.
 - The Sunken Tower at a low frame rate: staying on the steep sand and on the chain at full push.
 - The desert's new shaders (sand, water) on a slow machine or a phone.

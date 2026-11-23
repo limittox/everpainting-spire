@@ -9,7 +9,7 @@ import { Garden } from './bloom.js';
 import { Painter, PAINTS } from './paint.js';
 import { Vistas } from './vista.js';
 import { Day } from './day.js';
-import { createSettings } from './settings.js';
+import { createSettings, createKeys } from './settings.js';
 import { store, SAVE_VERSION } from './save.js';
 import { Secrets } from './secrets.js';
 import { Interior } from './interior.js';
@@ -48,6 +48,9 @@ const secrets = new Secrets(scene, world);
 const interior = new Interior(scene, world);
 // the second level: a world in pencil, a long way off, reached through a canvas in the atelier
 const under = new Underpainting(scene, world, uTime, interior.center);
+// two more of them are asleep in the Underpainting, drawn in pencil like everything there. Nothing in that world has a
+// colour to lend them: they wake to the brush, and hold whichever colour it was carrying
+for (const p of under.sleepers) { const b = new Blot(scene, p, blots.length); b.thirsty = true; b.mat.color.set(0xcdc9d6); blots.push(b); }
 const seedbed = new Seedbed(scene, world, uTime, under);
 const lastpage = new LastPage(scene, world, uTime, under, seedbed);          // the end of it: old paint to wipe away, four wells, and sunrise          // onward from the Dry Stair: vines, warm air, the Kiln
 const tubes = new Tubes(scene, world, uTime, seedbed);                           // the picture in it that can be stepped into: three tubes of paint, and mixing
@@ -118,7 +121,7 @@ const shadow = new THREE.Mesh(
 );
 scene.add(shadow);
 
-const painter = new Painter(renderer, world);
+const painter = new Painter(renderer, world, scene);
 
 const game = {
   state: 'title', // title | play | finale | gallery | menu
@@ -155,10 +158,12 @@ addEventListener('keydown', (e) => {
     if ((e.code === 'Enter' || e.code === 'Space') && e.target instanceof Element && e.target.closest('button, a')) return;
   }
   if (e.repeat) return;
-  keys.add(e.code); pressed.add(e.code);
+  const code = binds.hear(e.code);          // (the keys can be changed in the settings: the game hears the ones it was written for)
+  if (code === null) return;
+  keys.add(code); pressed.add(code);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
 });
-addEventListener('keyup', (e) => keys.delete(e.code));
+addEventListener('keyup', (e) => keys.delete(binds.hear(e.code)));
 addEventListener('blur', () => keys.clear());
 canvas.addEventListener('mousedown', (e) => {
   if (game.state === 'photo') { dragging = true; return; }
@@ -361,7 +366,7 @@ function openMenu() {
 function closeMenu() {
   if (!game.menu) return;
   const from = game.menu;
-  game.menu = null;
+  game.menu = null; binds.cancel();
   $id('menu').classList.add('hidden');
   document.activeElement?.blur?.();
   if (from === 'title') { $id('title').classList.remove('hidden'); return; }
@@ -566,6 +571,9 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
+const binds = createKeys($id('binds'));
+/** A line that names a key, with whichever key that now is. */
+const keyed = (text) => (binds.plain ? text : text.replace('<kbd>E</kbd>', '<kbd>' + binds.name('use') + '</kbd>').replace(/\bSpace\b/g, binds.name('jump')).replace(/\bShift\b/g, binds.name('skate')).replace(/hold E\b/, 'hold ' + binds.name('use')));
 let lastVolume = 0.8;       // what M brings the sound back to
 const settings = createSettings((key, v) => {
   if (key === 'volume') sound.setVolume(v);
@@ -704,7 +712,7 @@ const SOFT = ['#fff6e2', '#f7a8c8', '#b8a8f0', '#ffe2a0'];
 function hint(key, text, ms = 6500, loud = false) {
   if (game.hints[key]) return;
   game.hints[key] = true;
-  hud.hint(text, ms, loud);
+  hud.hint(keyed(text), ms, loud);
   if (loud) sound.pluck(true);
 }
 
@@ -792,7 +800,7 @@ function doSwing() {
   }
   fx.burst(tmp.set(sx, player.pos.y + 1, sz), 14, { speed: 4, up: 3.5, size: 0.34, life: 0.7, colors: [hex, hex, '#fff6e2'] });
   for (const b of blots) {
-    if (!b.awake) { if (b.g.position.distanceTo(player.pos) < 4.6) wakeBlot(b); continue; }
+    if (!b.awake) { if (b.g.position.distanceTo(player.pos) < 4.6) { if (b.thirsty) b.color = hex; wakeBlot(b); } continue; }
     const q = b.g.position;
     if ((q.x - sx) ** 2 + (q.z - sz) ** 2 < 2.3 * 2.3 && Math.abs(q.y - player.pos.y - 1) < 3 && b.color !== hex) {       // squarely in the way of the brush, not merely nearby
       b.splash(hex);
@@ -1198,6 +1206,7 @@ function updatePlay(dt, t) {
   // sleepers and companions
   for (const b of blots) {
     if (b.update(dt, t, player) === 'wake') wakeBlot(b);
+    else if (!b.awake && b.thirsty) { if (!game.hints.pencilled && b.g.position.distanceTo(player.pos) < 9) hint('pencilled', 'This one is only drawn. It is waiting to be given a colour.'); }
     else if (!b.awake && !game.hints.sleeper && b.g.position.distanceTo(player.pos) < 11) hint('sleeper', 'Something colourless is asleep here.');
   }
 
@@ -1299,12 +1308,12 @@ function updatePlay(dt, t) {
   }
   if (!game.hints.sketch && sketches.waiting(player.pos)) hint('sketch', 'Someone sketched this and never painted it. Swing your brush at it.', 7500);
   if (!game.hints.vista) for (const v of vistas.spots) if (v.pos.distanceTo(player.pos) < 13) hint('vista', 'An easel and a stool, looking out. A good place to rest.');
-  hud.prompt(prompt, progress);
+  hud.prompt(prompt && keyed(prompt), progress);
 
   // --- where next? no markers: a few golden flecks drift from the painter toward it
   let goal = null, objective;
   if (game.won) { objective = 'The painting is complete'; if (!game.hints.atelier) goal = world.gate; }       // the open door is the one thing left to point at
-  else if (world.bridges[0].progress < 1) { goal = world.bridges[0].anchor; objective = 'Paint the sketched bridge (hold E)'; }
+  else if (world.bridges[0].progress < 1) { goal = world.bridges[0].anchor; objective = keyed('Paint the sketched bridge (hold E)'); }
   else if (game.sparks < 3) {
     let best = 1e9;
     for (const s of sparks) if (!s.taken) { const d = s.g.position.distanceTo(player.pos); if (d < best) { best = d; goal = s.locked && s.lure ? s.lure : s.g.position; } }
@@ -1474,6 +1483,7 @@ function tick(dt) {
     else if (ev.type === 'faraway') { if (sound.ctx) sound.bell([329.63, 392, 440][ev.n], sound.ctx.currentTime, 0.016, 3.2); }
     else if (ev.type === 'storm') { sound.whoosh(90, 320, 7, 0.24, 0.5); sound.whoosh(300, 120, 9, 0.12, 0.4); }
     else if (ev.type === 'found') { sound.chime(ev.n + 2); sound.pluck(true); fx.burst(tmp.set(ev.x, ev.y, ev.z), 34, { speed: 4.5, up: 6, colors: ['#fff6d0', '#ffd060', ...DUST], size: 0.4, life: 1.2, gravity: 7, boost: 1.4 }); saveSoon(); }
+    else if (ev.type === 'lifted') { sound.play('sit'); sound.whoosh(120, 520, 4.5, 0.12, 0.5); }
     else if (ev.type === 'mount') { sound.play('wind'); sound.whoosh(200, 1200, 1.2, 0.16, 0.7); sound.pluck(true); }
     else if (ev.type === 'dismount') { sound.play('jump'); sound.play('glide'); }
     else if (ev.type === 'bell') sound.chime(ev.n);
@@ -1549,6 +1559,7 @@ function tick(dt) {
   // (colour goes slowly, when it goes: several seconds to drain. It comes back quickly)
   const sat = bright + (0.03 - bright) * mono;
   if (game.state !== 'finale') post.sat += (sat - post.sat) * (1 - Math.exp(-(sat < post.sat - 0.02 ? 0.32 : 1.6) * dt));
+  post.paintSat = gallery.bleak && !grey ? bright : 0;          // after the portrait, the painter's own strokes are the only colour left
   post.keepRed = 1;          // (whatever is marked keeps its own colour: blood, and what the brush carries)
   day.set(game.day, hung ? hung.name : paper ? 'paper' : null, hung ? hung.at : game.dawn);
   if (gallery.dark) { post.tint.setScalar(0.03); game.wasDark = true; }           // the grey room blinks: black, for a moment

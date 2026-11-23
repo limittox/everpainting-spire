@@ -64,3 +64,63 @@ export function createSettings(onChange) {
 
   return { values, set, get stored() { return stored; } };
 }
+
+// ------------------------------------------------------------------------------------------------ keys
+// The game itself only ever hears the keys it was written for (W, Space, E...). Choosing another key for one of
+// them is done here, before the game hears anything: the chosen key is passed on as the one it stands for.
+const KEYS = 'everpainting.keys.v1';
+export const ACTIONS = [
+  ['fwd', 'Forward', 'KeyW'], ['back', 'Back', 'KeyS'], ['left', 'Left', 'KeyA'], ['right', 'Right', 'KeyD'], ['jump', 'Jump', 'Space'],
+  ['skate', 'Skate', 'ShiftLeft'], ['use', 'Use', 'KeyE'], ['next', 'Next colour', 'KeyQ'], ['paint', 'Paint', 'KeyF'],
+];
+const FIXED = ['Escape', 'Tab', 'Enter'];     // never given away: the panel and the title need them
+export const keyName = (code) => code.replace(/^(Key|Digit)/, '').replace(/^Arrow(\w+)/, '$1 arrow').replace(/^Numpad/, 'Num ').replace(/(\w)(Left|Right)$/, '$1');
+
+export function createKeys(root) {
+  const bind = Object.fromEntries(ACTIONS.map(([a, , d]) => [a, d]));
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEYS) || '{}');
+    for (const [a] of ACTIONS) if (typeof saved[a] === 'string' && saved[a] && !FIXED.includes(saved[a])) bind[a] = saved[a];
+  } catch (e) { /* the keys as written, then */ }
+  const norm = (code) => (code === 'ShiftRight' ? 'ShiftLeft' : code);          // either Shift is Shift
+  let waiting = null;                                                             // the one whose button is waiting for a key
+  const show = () => {
+    for (const b of root.querySelectorAll('button[data-bind]')) { b.textContent = waiting === b.dataset.bind ? 'Press a key' : keyName(bind[b.dataset.bind]); b.setAttribute('aria-pressed', String(waiting === b.dataset.bind)); }
+    // (and wherever a key is named on the title and in the panel)
+    for (const el of document.querySelectorAll('[data-act]')) el.textContent = el.dataset.act.split(' ').map((a) => keyName(bind[a])).join(' ');
+  };
+  const keep = () => { try { localStorage.setItem(KEYS, JSON.stringify(bind)); } catch (e) { /* only for this visit, then */ } };
+  root.innerHTML = ACTIONS.map(([a, label]) => '<label>' + label + '<button data-bind="' + a + '"></button></label>').join('') + '<button class="reset" data-reset>Reset the keys</button>';
+  root.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.bind) waiting = waiting === b.dataset.bind ? null : b.dataset.bind;
+    else { for (const [a, , d] of ACTIONS) bind[a] = d; waiting = null; keep(); }
+    b.blur(); show();
+  });
+  // (heard before the game hears it, and kept from it: the next key pressed is the answer)
+  addEventListener('keydown', (e) => {
+    if (!waiting) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const code = norm(e.code);
+    if (code && !FIXED.includes(code)) {
+      const other = ACTIONS.find(([a]) => a !== waiting && bind[a] === code);
+      if (other) bind[other[0]] = bind[waiting];                                  // two things cannot share a key: they change places
+      bind[waiting] = code; keep();
+    }
+    waiting = null; show();
+  }, true);
+  show();
+  return {
+    bind,
+    /** What the game should hear when this key goes down or up (null: nothing at all). */
+    hear(code) {
+      code = norm(code);
+      for (const [a, , d] of ACTIONS) if (bind[a] === code) return d;
+      return ACTIONS.some(([, , d]) => d === code) ? null : code;                 // (a key whose own job has been given to another)
+    },
+    name: (a) => keyName(bind[a]),
+    get plain() { return ACTIONS.every(([a, , d]) => bind[a] === d); },
+    cancel() { if (waiting) { waiting = null; show(); } },
+  };
+}

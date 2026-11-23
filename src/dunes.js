@@ -187,7 +187,7 @@ export class Dunes {
     const base = world.groundHeight;
     world.groundHeight = (x, z, maxY) => {
       let h = base(x, z, maxY);
-      if (x < X0 - 130) return h;
+      if (x < X0 - 480) return h;
       for (const at of decks) { const y = at(x, z); if (y !== null && y <= maxY && y > h) h = y; }
       return h;
     };
@@ -200,7 +200,7 @@ export class Dunes {
      * is fitted along its length with a row of circles; anything round gets one. What the sand covers is left out, and
      * what barely shows above it is only a floor, to be stepped onto.
      */
-    const solid = (g, live) => {
+    const solid = (g, live, sand = duneH) => {
       const q = g.attributes.position, t = new V3(), mean = (i0, n) => { const v = new V3(); for (let i = i0; i < i0 + n; i++) v.add(t.fromBufferAttribute(q, i)); return v.divideScalar(n); };
       g.computeBoundingBox();
       const b = g.boundingBox, bottom = b.min.y, P = mean(0, q.count), N = new V3(0, 1, 0); let A, B;
@@ -215,15 +215,15 @@ export class Dunes {
         P.set((b.min.x + b.max.x) / 2, b.max.y, (b.min.z + b.max.z) / 2); A = new V3(r, 0, 0); B = new V3(0, 0, r);
       }
       const la = A.length(), lb = B.length(), cs = A.x / la, sn = A.z / la, top = (dx, dz) => P.y - (N.x * dx + N.z * dz) / N.y;
-      if (lb < 0.25 || P.y + (Math.hypot(N.x, N.z) / N.y) * la < duneH(P.x, P.z) + 0.1) return;
+      if (lb < 0.25 || P.y + (Math.hypot(N.x, N.z) / N.y) * la < sand(P.x, P.z) + 0.1) return;
       decks.push((x, z) => { if (live && !live()) return null; const dx = x - P.x, dz = z - P.z; return Math.abs(dx * cs + dz * sn) < la && Math.abs(dz * cs - dx * sn) < lb ? top(dx, dz) : null; });
       // (a tipped top is as high as it is where the painter is: so nobody stood on the low side of it is in the way of it.
       // And a thing has an underside: whoever has room to walk under it is not in the way of it either.)
-      const n = Math.max(1, Math.ceil((2 * (la - lb)) / lb) + 1), roof = (x, z) => (live && !live() ? -1e9 : top(x - P.x, z - P.z));
-      for (let i = 0; i < n; i++) {
-        const k = n > 1 ? ((i / (n - 1)) * 2 - 1) * (la - lb) : 0, x = P.x + cs * k, z = P.z + sn * k, y = top(cs * k, sn * k);
-        if (y > duneH(x, z) + 0.75) world.colliders.push({ x, z, r: lb, top: y, bottom, roof, late: true });          // (lower than that it is stepped onto, not walked into)
-      }
+      // A block is in the way as a block, with its own four sides (see player.js); anything round, as a drum. Where its top
+      // is no more than a step above whoever is beside it, it is stepped onto, not walked into.
+      const box = g.type === 'BoxGeometry', roof = (x, z) => (live && !live() ? -1e9 : top(x - P.x, z - P.z) - (box ? 0.7 : 0));
+      if (box) { let hi = -1e9; for (const [i, j] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) { const dx = cs * la * i - sn * lb * j, dz = sn * la * i + cs * lb * j; hi = Math.max(hi, top(dx, dz) - sand(P.x + dx, P.z + dz)); } if (hi > 0.75) world.colliders.push({ x: P.x, z: P.z, r: lb, hl: la, cs, sn, top: P.y, bottom, roof, late: true }); }
+      else if (P.y > sand(P.x, P.z) + 0.75) world.colliders.push({ x: P.x, z: P.z, r: lb, top: P.y, bottom, roof, late: true });
     };
     /**
      * Something egg-shaped, tipped any way (a great head): no upright drum fits that, so its own shape is asked. The
@@ -242,7 +242,7 @@ export class Dunes {
       return { set, out: (q) => { if (!live()) return; for (let i = 0; i < 4; i++) { const F = u.set(q.x, q.y + 0.9, q.z).applyMatrix4(Ei).length(); if (F >= 1) return; u.applyMatrix3(Nt); const l = Math.hypot(u.x, u.z) || 1; q.x += (u.x / l) * (1 - F) * 6; q.z += (u.z / l) * (1 - F) * 6; } } };
     };
     const hard = (g, pal) => { solid(g); add(g, pal); };
-    const set = (parts, p, s, yaw = 0, tipX = 0, tipZ = 0, firm = false) => { M.compose(p, Q.setFromEuler(E.set(tipX, yaw, tipZ, 'YXZ')), new V3(s, s, s)); for (const [g, pal] of parts) { g.applyMatrix4(M); if (firm) solid(g); add(g, pal); } return (x, y, z) => new V3(x, y, z).applyMatrix4(M); };
+    const set = (parts, p, s, yaw = 0, tipX = 0, tipZ = 0, firm = false) => { M.compose(p, Q.setFromEuler(E.set(tipX, yaw, tipZ, 'YXZ')), new V3(s, s, s)); for (const [g, pal] of parts) { g.applyMatrix4(M); if (firm) solid(g, undefined, firm === true ? duneH : firm); add(g, pal); } return (x, y, z) => new V3(x, y, z).applyMatrix4(M); };
     // a seated figure, twenty high from the foot of its seat to its crown
     const guardian = (arms = 3) => [
       [box(5, 6, 4, 0, 3, -1), STONE], [box(5.6, 0.7, 4.6, 0, 6.2, -1), STONE],
@@ -513,15 +513,44 @@ export class Dunes {
     for (const th of [0.5, 1.9, 3.0, 4.2, 5.5]) { const r = rimR(isl, th) - 0.5, lip = new V3(X0 + Math.cos(th) * r, 0, Z0 + Math.sin(th) * r); lip.y = duneH(lip.x, lip.z) + 0.1; pour(lip, th, 5 + (th * 3) % 4, lip.y - desertH(lip.x, lip.z) + 1); }
     // out in the open desert: rocks standing up out of it, two more of the great heads, and one of the seated ones, in to its chest
     {
+      // (each rock is weathered rather than turned: its sides go in and out in beds, rubble lies round its foot, a pillar or
+      // two has come away from it and still stands beside it, and its top is broken. No two are worn the same way.)
       this.mesas = [];
-      for (const [dx, dz, r, h] of [[-260, -180, 26, 120], [-190, -330, 18, 90], [310, -120, 30, 150], [220, 260, 22, 100], [-330, 140, 28, 130], [60, -420, 34, 170], [420, 90, 20, 110], [-150, 410, 24, 95]]) {
-        const y = desertH(X0 + dx, Z0 + dz) - 6; this.mesas.push([X0 + dx, Z0 + dz, r, h, y]);
-        add(place(new THREE.CylinderGeometry(r * 0.72, r, h, 9, 3), X0 + dx, y + h / 2, Z0 + dz, 0, dx, 0.03), ROCK, { scale: 0.02, spread: 0.8 });
-        add(place(new THREE.CylinderGeometry(r * 0.86, r * 0.8, h * 0.07, 9), X0 + dx, y + h, Z0 + dz, 0, dx, 0.03), ROCK, { scale: 0.02, spread: 0.8 });
-        world.colliders.push({ x: X0 + dx, z: Z0 + dz, r: r * 0.95, top: y + h, late: true });
-      }
-      for (const [p, s, yaw, tx, tz] of [[lowAt(-150, -250, 14), 30, 0.7, -0.35, 0.2], [lowAt(240, 60, 12), 26, -1.9, -0.6, -0.15]]) { set(head(), p, s, yaw, tx, tz); world.colliders.push({ x: p.x, z: p.z, r: s * 0.85, top: p.y + s, late: true }); }
-      { const p = lowAt(-52, 350, -31); set(guardian(), p, 3.2, 0.5, 0.05, -0.08); world.colliders.push({ x: p.x, z: p.z, r: 10, top: p.y + 60, late: true }); }
+      const worn = (g, seed, amt, n = 0, h = 1) => {
+        const q = g.attributes.position;
+        for (let i = 0; i < q.count; i++) {
+          const x = q.getX(i), y = q.getY(i), z = q.getZ(i), a = Math.atan2(z, x), bed = n ? (Math.round((y / h + 0.5) * n) % 2 ? 1 : -1) * 0.035 : 0;
+          const k = 1 + bed + amt * (Math.sin(y * 0.09 + seed) * 0.55 + Math.sin(a * 3 + y * 0.05 + seed * 1.7) * 0.5 + Math.sin(a * 7 + seed * 3.1) * 0.3);
+          q.setXYZ(i, x * k, y, z * k);
+        }
+        return g;
+      }, rock = { scale: 0.02, spread: 0.8 };
+      [[-260, -180, 26, 120], [-190, -330, 18, 90], [310, -120, 30, 150], [220, 260, 22, 100], [-330, 140, 28, 130], [60, -420, 34, 170], [420, 90, 20, 110], [-150, 410, 24, 95]].forEach(([dx, dz, r, h], i) => {
+        const x = X0 + dx, z = Z0 + dz, y = desertH(x, z) - 6, lean = (hh) => [x - Math.cos(dx) * 0.03 * (hh - h / 2), z + Math.sin(dx) * 0.03 * (hh - h / 2)];          // (it leans: where its middle is, so far up)
+        this.mesas.push([x, z, r, h, y]);
+        add(place(worn(new THREE.CylinderGeometry(r * 0.72, r, h, 11, 10), i * 2.3, 0.07, 10, h), x, y + h / 2, z, 0, dx, 0.03), ROCK, rock);
+        add(place(worn(new THREE.CylinderGeometry(r * 0.86, r * 0.8, h * 0.07, 11), i, 0.06), x, y + h, z, 0, dx, 0.03), ROCK, rock);
+        // rubble round the foot of it, half under the sand
+        add(place(worn(new THREE.CylinderGeometry(r * 1.0, r * 1.5, h * 0.1, 11, 2), i * 1.3, 0.12), x, y + h * 0.05, z, 0, dx + 0.4), [...ROCK, ...SAND.slice(0, 2)], rock);
+        // two beds of harder stone standing proud of the rest
+        for (const u of [0.43, 0.79]) { const [lx, lz] = lean(u * h); add(place(worn(new THREE.CylinderGeometry(r * (1.03 - 0.28 * u), r * (0.99 - 0.28 * u), h * 0.022, 11), i + u * 9, 0.05), lx, y + u * h, lz, 0, dx, 0.03), ROCK, rock); }
+        // what is left of the top: a second block, off to one side, and a shard beside it
+        const [tx, tz] = lean(h);
+        add(place(worn(new THREE.CylinderGeometry(r * 0.3, r * 0.42, h * 0.09, 7), i * 3.7, 0.1), tx + Math.cos(i * 2.4) * r * 0.3, y + h * 1.07, tz + Math.sin(i * 2.4) * r * 0.3, 0, i), ROCK, rock);
+        add(place(new THREE.ConeGeometry(r * 0.13, h * 0.11, 5), tx + Math.cos(i * 2.4 + 2.2) * r * 0.5, y + h * 1.08, tz + Math.sin(i * 2.4 + 2.2) * r * 0.5, 0.06, i), ROCK, rock);
+        world.colliders.push({ x, z, r: r * 1.24, top: y + h * 0.1, late: true }, { x, z, r: r * 1.02, top: y + h, late: true });          // (the rubble, and the rock)
+        // pillars that have come away from it: one close against its side, one standing free
+        for (const [b, d, pr, ph, tip] of [[i * 1.9 + 0.6, 1.0, 0.27, 0.62 - (i % 3) * 0.09, 0.02], [i * 1.9 + 2.9 + (i % 2), 1.75, 0.17, 0.36 + (i % 4) * 0.05, 0.05]]) {
+          const px = x + Math.cos(b) * r * d, pz = z + Math.sin(b) * r * d, py = desertH(px, pz) - 5;
+          add(place(worn(new THREE.CylinderGeometry(r * pr * 0.7, r * pr, h * ph, 7, 6), i + b, 0.08, 6, h * ph), px, py + (h * ph) / 2, pz, tip, b, tip), ROCK, rock);
+          add(place(worn(new THREE.CylinderGeometry(r * pr * 0.84, r * pr * 0.74, h * 0.03, 7), i + b * 2, 0.06), px, py + h * ph, pz, tip, b, tip), ROCK, rock);
+          world.colliders.push({ x: px, z: pz, r: r * pr * 1.04, top: py + h * ph, late: true });
+        }
+      });
+      // (a head is the shape of an egg, and is in the way exactly where it is; the seated one is made of blocks, each of them solid)
+      this.outs = [];
+      for (const [p, s, yaw, tx, tz] of [[lowAt(-150, -250, 14), 30, 0.7, -0.35, 0.2], [lowAt(240, 60, 12), 26, -1.9, -0.6, -0.15]]) { set(head(), p, s, yaw, tx, tz); this.outs.push(egg(M.clone().scale(new V3(0.86, 1.12, 0.96)).invert(), () => true).out); }
+      { const p = lowAt(-52, 350, -31); set(guardian(), p, 3.2, 0.5, 0.05, -0.08, desertH); }
     }
     this.mesh = bag.mesh(stoneMat()); this.mesh.material.side = THREE.DoubleSide; this.mesh.frustumCulled = false;
 
@@ -567,7 +596,11 @@ export class Dunes {
         // (it is old: it has cracked)
         ...[[-1.55, 8.25, 1.215, 0.4, 0.9], [1.75, 9.15, 1.215, -0.5, 0.7], [-0.9, 7.6, 0.965, -0.3, 0.6], [1.45, 4.7, 0.87, 0.35, 1.1], [-1.5, 1.6, 0.74, -0.25, 0.9], [1.2, 7.1, 0.965, 0.6, 0.5]].map(([x, y, z, a, l]) => [box(0.05, l, 0.05, x, y, z, 0, 0, a), SHADE]),
       ];
-      const body = new THREE.Group(); body.add(made(bodyParts));
+      // (its legs are its own to move: everything below its hips, on either side, hangs from that hip)
+      const legParts = [[], []], trunk = [];
+      for (const part of bodyParts) { part[0].computeBoundingBox(); const b = part[0].boundingBox, cx = (b.min.x + b.max.x) / 2; (b.max.y <= 5.55 && Math.abs(cx) > 0.3 ? legParts[cx < 0 ? 0 : 1] : trunk).push(part); }
+      const body = new THREE.Group(); body.add(made(trunk));
+      const legs = [-1, 1].map((k, i) => { const g = new THREE.Group(), m = made(legParts[i]); g.position.set(k * 1.15 * U, 5.5 * U, 0); m.position.copy(g.position).negate(); g.add(m); body.add(g); return g; });
       // arms, each hung from its shoulder: the upper arm, a band at the elbow, the forearm, a fist
       const armParts = [-1, 1].map((k) => [[box(1.25, 2.9, 1.35, k * 0.3, -1.8, 0), STONE], [box(1.4, 0.32, 1.5, k * 0.3, -3.35, 0), GILT], [box(1.15, 2.6, 1.25, k * 0.3, -4.75, 0.1), STONE], [box(1.35, 1.25, 1.45, k * 0.3, -6.6, 0.15), STONE],
         [place(new THREE.CylinderGeometry(0.72, 0.72, 0.3, 10), k * 0.98, -0.4, 0, 0, 0, Math.PI / 2), GILT], ...[-1.0, -2.5].map((y) => [box(1.29, 0.07, 1.39, k * 0.3, y, 0), SHADE]),
@@ -595,8 +628,11 @@ export class Dunes {
       const firm = (parts, m, live = up) => { for (const [g] of parts) { g.computeBoundingBox(); const d = g.boundingBox.max.clone().sub(g.boundingBox.min); if (g.type === 'BoxGeometry' && d.x * d.y * d.z > 60) solid(g.clone().applyMatrix4(m), live); } };
       // (Its right arm has two places: down at its side; and, once its heart is going, held out level with the roof of the
       // tower, for the painter to step onto the back of its hand. It is solid in whichever it is at, and in neither on the way.)
-      const HELD = [-Math.PI / 2 + 0.07, 0.25];          // (a little below level: so that the back of its hand comes just above the roof) this.handK = 0; arms[0].rotation.order = 'YXZ';
-      firm(bodyParts, stood); arms.forEach((a, i) => { const m = stood.clone().multiply(new THREE.Matrix4().makeTranslation(a.position.x, a.position.y, a.position.z)); firm(armParts[i], m, i ? up : () => up() && this.handK < 0.02); if (!i) firm(armParts[i], m.clone().multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(HELD[0], HELD[1], 0, 'YXZ'))), () => up() && this.handK > 0.98); });
+      const HELD = [-Math.PI / 2 + 0.07, 0.25];          // (a little below level: so that the back of its hand comes just above the roof)
+      this.handK = 0; arms[0].rotation.order = 'YXZ';
+      // And it carries: whoever stands on that hand is lifted up over its head, to see what it sees, and brought back.
+      this.carry = null; this.carryK = 0; this.carried = false;
+      firm(bodyParts, stood); arms.forEach((a, i) => { const m = stood.clone().multiply(new THREE.Matrix4().makeTranslation(a.position.x, a.position.y, a.position.z)); firm(armParts[i], m, i ? up : () => up() && this.handK < 0.02); if (!i) firm(armParts[i], m.clone().multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(HELD[0], HELD[1], 0, 'YXZ'))), () => up() && this.handK > 0.98 && this.carryK < 0.01); });
       this.held = HELD;
       // Its right ear is open: a doorway in the side of its head, at the height its shoulder brings the painter to, with the
       // light of what is inside showing in it.
@@ -612,7 +648,7 @@ export class Dunes {
       this.works = new Works(scene, world, decks, new V3(X0 + 1500, 300, Z0));
       this.hearted = false; this.beamT = 0; this.inWorks = false;
       this.frames[1].open = () => this.hearted;          // (the frame on the roof: not there until the heart is going)
-      this.giant = { root, body, hd, arms, eyes, rest, Ei, egg: egg(Ei, up), at, ear, fireIn, beam, chest, roof, y0: lie.y - HC * U, y1, T: -1, k: 0, dust: 0, q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ') };
+      this.giant = { root, body, hd, arms, legs, eyes, rest, Ei, egg: egg(Ei, up), at, ear, fireIn, beam, chest, roof, y0: lie.y - HC * U, y1, T: -1, k: 0, dust: 0, q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ') };
     }
 
     scene.add(this.mesh);
@@ -777,6 +813,19 @@ export class Dunes {
       // the track that lights behind the painter, round the palms
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(400 * 3), 3)); g.setDrawRange(0, 0);
       this.dots = new THREE.Points(g, new THREE.PointsMaterial({ map: world.glowTex, size: 2, color: 0x7ff2ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); this.dots.frustumCulled = false;
+      {
+        const a = this.foot, b = this.head, L = Math.hypot(b.x - a.x, b.z - a.z), ux = (b.x - a.x) / L, uz = (b.z - a.z) / L, len = 16.6, hi = 2.7, mid = 7.7;
+        const lat = map.clone(); lat.wrapS = THREE.RepeatWrapping; lat.repeat.set((len * 384) / (7.2 * 384), (hi * 576) / (10.8 * 576)); lat.offset.set(0, 0.73); lat.needsUpdate = true;
+        const pg = new THREE.PlaneGeometry(len, hi); pg.setAttribute('color', new THREE.BufferAttribute(new Float32Array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 1, 1, 1, 1, 1, 1]), 3));          // (bright along the rail, gone by the top)
+        this.railMat = new THREE.MeshBasicMaterial({ map: lat, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+        this.rails = [-1, 1].map((k) => {
+          const m = new THREE.Mesh(pg, this.railMat);
+          m.position.set(a.x + ux * mid - uz * 3.5 * k, a.y + ((b.y - a.y) * mid) / L + hi / 2 + 0.2, a.z + uz * mid + ux * 3.5 * k);
+          m.rotation.set(0, Math.atan2(-uz, ux), Math.atan2(b.y - a.y, L));
+          return m;
+        });
+        scene.add(...this.rails); this.all.push(...this.rails);
+      }
       scene.add(this.gate, this.dots); this.all.push(this.gate, this.dots);
       this.spark = new Spark(scene, lowAt(MIRAGE[0] - 0.3, MIRAGE[1] - 0.9), world.glowTex); this.spark.hidden = true; this.spark.g.visible = false;
       this.open = false; this.asked = false;          // is the gate open? has the painter been to it, and been told?
@@ -811,9 +860,16 @@ export class Dunes {
       }
       g.visible = false; scene.add(g); this.all.push(g);
       /** Where it is, a distance d along its round: down in the sand, or up over it in an arch. */
+      // (It does not go the same round twice. Each time it swings out a different distance, up to twenty-odd wider than
+      // its least; and each time it comes out it comes a different height. Two things it always does: it keeps inside of
+      // the rock to the east of its round, and outside of the one to the north-west.)
+      const near = (th, mid, wide) => { const d = Math.atan2(Math.sin(th - mid), Math.cos(th - mid)) / wide; return Math.exp(-d * d); };
+      const frac = (v) => v - Math.floor(v);
       const at = (d, out) => {
-        const m = ((d % LAP) + LAP) % LAP, th = m / RC, x = CX + Math.sin(th) * RC, z = CZ + Math.cos(th) * RC; let off = -B;
-        for (const [a, L, H] of ARCS) { const t = (m - a) / L; if (t > 0 && t < 1) off = -B + (H + B) * Math.sin(Math.PI * t); }
+        const m = ((d % LAP) + LAP) % LAP, lap = Math.floor(d / LAP), th = m / RC;
+        const r = RC + (1 - near(th, deg(105), 0.6)) * (11 + 11 * Math.sin((d * TAU * 0.618) / LAP + 1)) + 9 * near(th, deg(303), 0.5);
+        const x = CX + Math.sin(th) * r, z = CZ + Math.cos(th) * r; let off = -B;
+        ARCS.forEach(([a, L, H], i) => { const t = (m - a) / L; if (t > 0 && t < 1) off = -B + (H * (lap < 0 ? 1 : 0.78 + 0.5 * frac(Math.sin(lap * 12.9898 + i * 78.233) * 43758.5453)) + B) * Math.sin(Math.PI * t); });
         return out.set(x, desertH(x, z) + off, z);
       };
       this.worm = { parts, at, d: 0, puff: 0, sign: 0, rider: -1, cool: 0, rode: 0, high: false, GAP, R, LAP, ARCS, long: N * GAP, first: ARCS[0][0] - 105 };
@@ -888,6 +944,15 @@ export class Dunes {
   goal() { return this.inWorks ? this.works.goal() : this.done ? (this.hearted || this.giant.k < 1 ? null : this.flung ? this.giant.ear.getWorldPosition(this._g || (this._g = new V3())) : this.ring.position) : this.below ? (!this.open && this.orb < 2 && (this.asked || this.orb === 1) ? this.mirageAt : this.foot) : this.from >= 4 ? this.perch : this.perches[this.from + 1].p; }
 
   /** Press the sand down round a point: `r` wide, and how deep (0..1). A little of it is heaped round the edge. */
+  /** Sand pushed up from underneath at (x, z): a mound, 'r' across and so high. */
+  heap(x, z, r, high, tr = this.low) {
+    const c = tr.c, S = 1024 / tr.size, u = (x - tr.x0) * S, v = (z - tr.z0) * S, R = r * S;
+    if (u < -R || v < -R || u > 1024 + R || v > 1024 + R) return;          // (nowhere near the sand that keeps marks)
+    const g = c.createRadialGradient(u, v, 0, u, v, R);
+    g.addColorStop(0, 'rgba(255,255,255,' + high + ')'); g.addColorStop(0.55, 'rgba(255,255,255,' + high * 0.6 + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g; c.fillRect(u - R, v - R, R * 2, R * 2);
+    tr.dirty = true;
+  }
   dig(x, z, r, depth, tr = this.top) {
     const c = tr.c, S = 1024 / tr.size, u = (x - tr.x0) * S, v = (z - tr.z0) * S, R = r * S;
     let g = c.createRadialGradient(u, v, R * 0.5, u, v, R * 1.9);
@@ -927,6 +992,7 @@ export class Dunes {
     }
     if (this.giant.T > 17 && this.giant.T < 34 && h > TOP - 1) return { key: 'woken', line: 'It was under the sand all the while. It does nothing. It looks.' };
     if (this.spin > 0.8 && !this.flung && h > TOP - 1 && near(this.ring.position, 11)) return { key: 'hoops', line: 'The hoops have begun to turn. There is room in the middle of them for whoever jumps.' };
+    if (this.carry) return { key: 'carried', line: 'It holds you up to see what it sees. Jump, and it brings you back.' };
     if (this.handK > 0.98 && h > TOP - 1) return { key: 'hand', line: 'It is holding its hand out, level with the roof.' };
     if (this.hearted && h > TOP - 1) return { key: 'roofframe', line: 'The frame on the roof leads back to the gallery.' };
     if (this.flung && !this.hearted && h > 60 && near(this.giant.at, 30)) return { key: 'ear', line: 'Its ear is open. There is a light in it.' };
@@ -982,7 +1048,7 @@ export class Dunes {
     }
 
     // ---- the tower is in the way, at whatever height the painter is; and the needle, on the roof; and the great head in the sand
-    this.headOut(p);
+    this.headOut(p); if (this.below) for (const out of this.outs) out(p);
     if (h > -2 && h < TOP - 0.1) { const dx = p.x - ax(h), dz = p.z - az(h), d = Math.hypot(dx, dz) || 1, need = wall(h) + 0.45; if (d < need) { p.x = ax(h) + (dx / d) * need; p.z = az(h) + (dz / d) * need; } }
     if (h > TOP - 0.5 && h < PERCH + 2) { const dx = p.x - this.needle.x - LX * (h - TOP), dz = p.z - this.needle.z, d = Math.hypot(dx, dz) || 1; if (d < 1.75) { p.x += (dx / d) * (1.75 - d); p.z += (dz / d) * (1.75 - d); } }
 
@@ -1026,6 +1092,8 @@ export class Dunes {
       }
       if (W.puff <= 0) W.puff = 0.1;
       if (!out && W.sign <= 0) { W.sign = 0.3; const h = W.parts[0].position; ev.push({ type: 'heave', x: h.x, y: desertH(h.x, h.z) + 0.5, z: h.z, n: 4, fall: true }); }
+      // (and the sand over it is lifted into a ridge as it goes by underneath, which the wind takes down again after)
+      if (W.puff === 0.1) for (const i of [0, 3]) { const m = W.parts[i].position; if (m.y < desertH(m.x, m.z) - 1) this.heap(m.x + (Math.random() - 0.5) * 2, m.z + (Math.random() - 0.5) * 2, W.R * 0.8, 0.34, this.low); }
       // Riding it. Whoever touches a length of it that is out of the sand is taken up onto its back, and sits there on the
       // ridge of its plates, and is carried: over the arch, and down, and on under the sand (where the tips of the plates
       // still cut the surface, and the rider goes along on them), round and round, until they jump. Under the sand it can
@@ -1038,7 +1106,7 @@ export class Dunes {
           const m = W.parts[i], under = over(m) < 1, d2 = m.position.distanceToSquared(v);
           if (!under && d2 < 70 * 70) this.wormNear = true;
           const touch = under ? i < 14 && (m.position.x - p.x) ** 2 + (m.position.z - p.z) ** 2 < 20 && Math.abs(p.y - desertH(p.x, p.z)) < 2.5 : d2 < (W.R + 1.6) ** 2;
-          if (touch && !W.cool && !player.lift && !player.seat) { W.rider = i; W.rode = 0; W.high = false; player.sit(p, player.heading); ev.push({ type: 'mount' }); break; }
+          if (touch && !W.cool && !player.lift && !player.seat) { W.rider = i; W.rode = 0; W.high = false; player.sit(p, player.heading); player.seat.ride = true; ev.push({ type: 'mount' }); break; }
         }
       }
       if (W.rider >= 0) {
@@ -1065,10 +1133,36 @@ export class Dunes {
       const G = this.giant, T = G.T, k = T < 0 ? 0 : smooth((T - 3.5) / 13), open = T < 0 ? 0 : smooth((T - 0.8) / 2.2), was = G.k;
       if (T >= 0) G.T += dt;
       G.k = k; G.body.visible = T >= 0;
-      G.root.position.set(G.at.x, G.y0 + (G.y1 - G.y0) * k, G.at.z);
-      G.root.rotation.x = 0.1 * Math.sin(Math.PI * k); G.root.rotation.z = 0.02 * Math.sin(T * 1.3) * Math.sin(Math.PI * k);
-      G.arms.forEach((a, i) => { a.rotation.x = -0.5 * Math.sin(Math.PI * k); a.rotation.z = (i ? 1 : -1) * 0.14 * Math.sin(Math.PI * k); });
-      { this.handK += clamp((this.hearted && !this.inWorks && k >= 1 ? 1 : 0) - this.handK, -dt / 5, dt / 5); const e = smooth(this.handK); G.arms[0].rotation.x += this.held[0] * e; G.arms[0].rotation.y = this.held[1] * e; }
+      // (It climbs out: three heaves, not one long slide. On each, an arm goes up and forward over the sand and bears down as
+      // the rest of it comes up after, first one and then the other, and it rocks from side to side with them. Once its
+      // hips are clear its legs come up in turn, a knee at a time, and are stood on. All of it is still again by the end.)
+      const E = Math.sin(Math.PI * k), beat = 6 * Math.PI * k;
+      G.root.position.set(G.at.x, G.y0 + (G.y1 - G.y0) * (k + 0.034 * Math.sin(beat)), G.at.z);
+      G.root.rotation.x = 0.2 * E + 0.04 * E * Math.cos(beat); G.root.rotation.z = 0.07 * E * Math.sin(beat / 2) + 0.02 * Math.sin(T * 1.3) * E;
+      G.arms.forEach((a, i) => { a.rotation.x = -E * (1.2 + 0.95 * Math.sin(beat / 2 + (i ? Math.PI : 0) + 0.6)); a.rotation.z = (i ? 1 : -1) * 0.2 * E; });
+      G.legs.forEach((l, i) => { const a = i ? 0.7 : 0.52; l.rotation.x = -0.8 * Math.sin(Math.PI * clamp((k - a) / 0.27, 0, 1)); });
+      {
+        this.handK += clamp((this.hearted && !this.inWorks && k >= 1 ? 1 : 0) - this.handK, -dt / 5, dt / 5);
+        // (carrying: whoever has stood on the back of its hand for a moment is taken up; a jump, or a while, and they are brought back)
+        const C = this.carry, arm = G.arms[0], U = 7.5, UPX = -0.85;
+        if (C) {
+          C.t += dt;
+          if (C.down < 0 && C.t > 5.5 && (C.t > 26 || player.jumpBuf > 0.1 || !player.seat)) C.down = C.t;
+          this.carryK = C.down < 0 ? smooth(C.t / 5) : 1 - smooth((C.t - C.down) / 5);
+        }
+        const e = smooth(this.handK), phi = UPX * this.carryK; arm.rotation.x += this.held[0] * e + phi; arm.rotation.y = this.held[1] * e;
+        if (!C && this.handK > 0.98 && !player.seat && !player.lift) {
+          arm.updateWorldMatrix(true, false); const f = arm.localToWorld(this._v.set(-0.3 * U, -6.6 * U, 0.15 * U)), on = player.grounded && Math.hypot(p.x - f.x, p.z - f.z) < 4.2 && Math.abs(p.y - f.y - 0.725 * U) < 1.2;
+          if (!on) { this.carried = false; this.carryWait = 0; } else if (!this.carried && (this.carryWait = (this.carryWait || 0) + dt) > 0.9) { this.carry = { t: 0, down: -1 }; this.carried = true; player.sit(p, player.heading); ev.push({ type: 'lifted' }); }
+        }
+        if (C) {
+          // (sat on the back of the hand: the top of the fist, wherever the arm has it, and however it is tipped)
+          arm.updateWorldMatrix(true, false); const top = arm.localToWorld(this._v.set(-0.3 * U, -6.6 * U, 0.15 * U)), tip = this.held[0] * e + phi + Math.PI / 2;
+          top.y += Math.min(0.725 / Math.max(0.01, Math.abs(Math.cos(tip))), 0.625 / Math.max(0.01, Math.abs(Math.sin(tip)))) * U + 0.05;
+          if (C.down >= 0 && C.t - C.down >= 5) { this.carry = null; this.carryK = 0; player.stand(); p.copy(top); player.vel.set(0, 0, 0); player.grounded = true; }
+          else if (player.seat) { player.seat.pos.copy(top); p.copy(top); }
+        }
+      }
       for (const { e, g } of G.eyes) { e.visible = open > 0.01; e.scale.y = Math.max(0.01, open); g.material.opacity = open * (0.8 + 0.12 * Math.sin(t * 2.3)); }
       if (T < 0) G.hd.quaternion.copy(G.rest);
       else {
@@ -1149,6 +1243,7 @@ export class Dunes {
       this.dots.geometry.setDrawRange(0, this.dotN);
       this.gateK += ((this.open ? 0 : 1) - this.gateK) * (1 - Math.exp(-1.6 * dt));
       this.gate.visible = this.gateK > 0.02; this.gate.material.opacity = this.gateK * (0.8 + 0.15 * Math.sin(t * 2.2));
+      for (const m of this.rails) m.visible = this.gate.visible; this.railMat.opacity = this.gateK * (0.5 + 0.12 * Math.sin(t * 2.2 + 1));
     }
 
     // ---- the sand takes the mark of what crosses it

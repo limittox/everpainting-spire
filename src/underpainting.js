@@ -280,6 +280,8 @@ export class Underpainting {
     // (arriving, the painter stands in front of the way back but faces along the terrace, toward the first spring,
     // so that the camera behind them has open ground to stand on)
     this.arrive = { pos: floor(at(Math.PI / 2, 27)), heading: -Math.PI / 2 };
+    // two of the colourless ones are asleep here as well, one by the way in and one up on the middle terrace (see main.js)
+    this.sleepers = [floor(at(1.22, 24.6)), at(0.32, 15.2, MID.y)];
     this.backAt = floor(at(Math.PI / 2, 31));
     {
       const g = new THREE.Group(); g.position.copy(this.backAt); g.rotation.y = Math.PI;

@@ -216,6 +216,12 @@ export class Player {
       if (top !== undefined && Math.max(y0, this.pos.y) >= top - 0.05) continue;
       if (c.bottom !== undefined && this.pos.y + 1.7 < c.bottom) continue;          // (under it, with room to spare)        // above it, or was as this step began: nothing in the way (so what has a floor on top is landed on, not slid off)
       const dx = this.pos.x - c.x, dz = this.pos.z - c.z, rr2 = c.r + this.radius;
+      if (c.hl) {
+        // a block, not a drum: 'hl' long each way along (cs, sn) and 'r' wide each way across it. Out through the nearer side
+        const u = dx * c.cs + dz * c.sn, v = dz * c.cs - dx * c.sn, pu = c.hl + this.radius - Math.abs(u), pv = rr2 - Math.abs(v);
+        if (pu > 0 && pv > 0) { if (pu < pv) { const k = (u < 0 ? -1 : 1) * pu; this.pos.x += c.cs * k; this.pos.z += c.sn * k; } else { const k = (v < 0 ? -1 : 1) * pv; this.pos.x -= c.sn * k; this.pos.z += c.cs * k; } }
+        continue;
+      }
       const d2 = dx * dx + dz * dz;
       if (d2 < rr2 * rr2 && d2 > 1e-6) {
         const d = Math.sqrt(d2);
@@ -284,7 +290,13 @@ export class Player {
     // Index 0 is the painter's right side, 1 the left. Thighs and upper arms: negative swings forward.
     // Knees bend with positive angles, elbows with negative ones.
     let th0, th1, kn0, kn1, a0, a1, e0, e1, armZ = 0.1, lean, bob = 0, spread = 0, headX = 0;
-    if (this.seat) {
+    if (this.seat && this.seat.ride) {
+      // astride something that is going somewhere: knees out and gripping, both hands down on it in front, leant into
+      // the wind and rocking with it, head up, the cloak streaming
+      const rock = Math.sin(t * 2.3) * 0.06;
+      th0 = -1.2; th1 = -1.2; kn0 = 1.0; kn1 = 1.0; a0 = -0.85 + rock; a1 = -0.85 - rock; e0 = e1 = -0.45;
+      armZ = 0.3; lean = 0.42 + rock; bob = -0.3 + Math.sin(t * 4.6) * 0.025; spread = 0.7; headX = -0.38;
+    } else if (this.seat) {
       // seated properly: thighs level, shins down, one hand on a knee and the other working at the easel
       const paint = this.seat.painting;
       th0 = -1.5; th1 = -1.42; kn0 = 1.5; kn1 = 1.36;
@@ -335,7 +347,7 @@ export class Player {
     // blinking; eyes half closed when simply sitting and looking
     this.blink -= dt;
     if (this.blink < -0.13) this.blink = 2 + Math.random() * 4;
-    const lid = this.blink < 0 ? 0.1 : this.seat && !this.seat.painting ? 0.62 : 1;
+    const lid = this.blink < 0 ? 0.1 : this.seat && !this.seat.painting && !this.seat.ride ? 0.62 : 1;
     for (const eye of m.eyes) eye.scale.y += (lid - eye.scale.y) * (1 - Math.exp(-30 * dt));
 
     // brush swing overrides the left arm

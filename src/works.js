@@ -8,10 +8,20 @@ import { daub, place, Bag, paintify, glowSprite, clamp } from './util.js';
 // turns faster; the round door in its chest opens (the blue circle, seen from behind), and the painter is put out
 // through it. Falling in here is not failing either: whoever drops too far is carried back to the wheel they left.
 //
+// And there are other ways about: a lift on a great rod between the floor and one of the wheels, and a column of steam
+// by the ledge at the top that carries an open cloak the whole height of the place.
+//
 // It is nowhere near the desert it is entered from (far east of it), so that nothing out there is in its way or it in theirs.
 
 const V3 = THREE.Vector3, TAU = Math.PI * 2, UP = new V3(0, 1, 0);
 const R = 24, TOP = 14, FLOOR = -60, HEART = -55.4, COGS = 11, COG_R = 5.6, RING = 13;
+// Two wheels that touch really do drive one another here: their teeth are the same size, they stand as far apart as lets
+// a tooth of one into a gap of the other, and the driven one is turned from the driver (so many teeth past, so many
+// teeth on), never on its own. PIN is the small wheel that drives each wheel of the stair; MESH, how far apart two
+// wheels of radii r and s stand; and 'driven', where the second must be when the first is at 'turn' (both lying in the
+// same plane, the second off towards 'way' from the first, the first with n teeth and the second with m).
+const PIN = 5, PIN_R = (COG_R * PIN) / 16, MESH = (r, s) => r + s + 0.875 + 0.3;
+const driven = (turn, way, n, m) => -(way + Math.PI - Math.PI / m + (way + turn) * (n / m));
 const BRASS = ['#b8893a', '#a67a30', '#c99a48', '#8f6a2a', '#d4a850'], IRON = ['#4a4038', '#3c342e', '#584c42', '#332c28'];
 const COPPER = ['#b4603a', '#9c5230', '#c87246', '#8a4628'], PLATE = ['#6a5a44', '#5c4e3c', '#786850', '#4e4234'], GILT = ['#e0b860', '#c99a3e', '#f0cc78'];
 const smooth = (k) => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
@@ -65,7 +75,11 @@ export class Works {
     this.cogs = [];
     for (let i = 0; i < COGS; i++) {
       const a = Math.PI + 0.36 + i * 0.84, x = Math.cos(a) * RING, z = Math.sin(a) * RING, y = -5 * (i + 1), m = mesh(gear(COG_R, 16));
-      m.position.set(x, y, z); root.add(m); this.cogs.push({ m, x: C.x + x, y: C.y + y, z: C.z + z, w: (i % 2 ? -1 : 1) * 0.32 });
+      // (and the little wheel that drives it, out on its arm by the wall, tooth in gap: it can be stood on as well)
+      const pr = RING + MESH(COG_R, PIN_R), px = Math.cos(a) * pr, pz = Math.sin(a) * pr, pin = mesh(gear(PIN_R, PIN, 0.9, false));
+      pin.position.set(px, y, pz); root.add(pin); add(cyl(0.34, 0.34, 1.3, 8, px, y - 1.0, pz), IRON);
+      decks.push((qx, qz) => ((qx - C.x - px) ** 2 + (qz - C.z - pz) ** 2 < (PIN_R + 0.6) ** 2 ? C.y + y : null));
+      m.position.set(x, y, z); root.add(m); this.cogs.push({ m, pin, a, x: C.x + x, y: C.y + y, z: C.z + z, w: (i % 2 ? -1 : 1) * 0.32 });
       // (what holds it: an arm out from the wall, under it, and a lamp on the arm)
       add(box(R - RING, 0.5, 0.8, Math.cos(a) * (RING + R) / 2, y - 1.25, Math.sin(a) * (RING + R) / 2, 0, -a), IRON); add(cyl(0.45, 0.45, 1.0, 8, x, y - 1.2, z), IRON);
       lamp(Math.cos(a) * (R - 2.2), y + 1.6, Math.sin(a) * (R - 2.2), 5.5, 0xffb060, 0.7);
@@ -80,11 +94,15 @@ export class Works {
       world.colliders.push({ x: C.x, z: C.z, r: 1.9, top: C.y + TOP, bottom: C.y - 46.5, late: true });
     }
     // ---- wheels on the wall, turning on edge; and rods that go up and down in their sleeves
+    // (in pairs: a great one and a small one beside it in the same plane, the small one turned by the great one. Each is
+    // [where round the wall, how high, its teeth, how fast, the small one's teeth, and which way the small one lies from
+    // it: 0 is along the wall, a quarter turn is straight up]. Every tooth is two units round, so any two wheels fit.)
     this.wall = [];
-    for (const [a, y, r, w] of [[0.9, 2, 4.2, 0.5], [1.32, -3.2, 2.6, -0.81], [2.5, -12, 4.8, 0.4], [4.0, -9, 3.4, -0.6], [5.3, -20, 4.4, 0.45], [5.75, -26, 2.8, -0.7], [0.3, -33, 4.6, 0.42], [2.2, -40, 3.6, -0.55], [3.7, -29, 3.0, 0.6]]) {
-      const g = new THREE.Group(), m = mesh(gear(r, Math.round(r * 3.2), 0.8)); g.add(m);
+    for (const [a, y, n, w, n2, lie] of [[0.9, 2, 13, 0.5, 8, -0.95], [2.5, -12, 15, 0.4, 7, 2.55], [4.0, -9, 11, -0.6, 7, -2.3], [5.3, -22.5, 14, 0.45, 9, -0.95], [0.3, -33, 15, 0.42, 7, -2.2], [2.2, -42.5, 12, -0.55, 8, 2.5], [3.7, -29, 10, 0.6, 7, 0.9]]) {
+      const r = (n * 2) / TAU, r2 = (n2 * 2) / TAU, way = a + Math.PI / 2 - lie, d = MESH(r, r2);
+      const g = new THREE.Group(), m = mesh(gear(r, n, 0.8)), mate = mesh(gear(r2, n2, 0.8)); mate.position.set(Math.cos(way) * d, 0, Math.sin(way) * d); g.add(m, mate);
       g.position.set(Math.cos(a) * (R - 1.4), y, Math.sin(a) * (R - 1.4)); g.quaternion.setFromUnitVectors(UP, new V3(-Math.cos(a), 0, -Math.sin(a))); root.add(g);
-      this.wall.push({ m, w });
+      this.wall.push({ m, w, mate, way, n, n2 });
     }
     this.rods = [];
     for (const [a, y, ph] of [[1.75, -6, 0], [1.95, -6, 2.1], [4.6, -16, 1], [4.8, -16, 3.1], [0.55, -45, 0.5], [3.2, -47, 2.6]]) {
@@ -183,12 +201,12 @@ export class Works {
     this.fast += ((this.painted ? 2.6 : 1) - this.fast) * (1 - Math.exp(-0.8 * dt));
     const step = dt * this.fast; this.ph += step;
     for (const c of this.cogs) {
-      c.m.rotation.y -= c.w * step;
+      c.m.rotation.y -= c.w * step; c.pin.rotation.y = driven(c.m.rotation.y, c.a, 16, PIN);
       // whoever stands on a wheel goes round with it
       if (player.grounded && Math.abs(p.y - c.y) < 0.2 && (p.x - c.x) ** 2 + (p.z - c.z) ** 2 < (COG_R + 0.4) ** 2) { const s = Math.sin(c.w * step), k = Math.cos(c.w * step), dx = p.x - c.x, dz = p.z - c.z; p.x = c.x + dx * k - dz * s; p.z = c.z + dx * s + dz * k; player.heading -= c.w * step; }
     }
     this.axle.rotation.y += 0.22 * step;
-    for (const w of this.wall) w.m.rotation.y += w.w * step;
+    for (const w of this.wall) { w.m.rotation.y += w.w * step; w.mate.rotation.y = driven(w.m.rotation.y, w.way, w.n, w.n2); }
     for (const r of this.rods) r.m.position.y = r.y + Math.sin(this.ph * 1.7 + r.ph) * 1.6;
     // the lift: slowly up to the eighth wheel and slowly down again, resting a moment at each end; and the steam
     { const u = clamp(0.5 - 0.72 * Math.cos(this.ph * 0.3), 0, 1), e = u * u * (3 - 2 * u); this.lift.y = FLOOR + 0.2 + (20 - 0.2) * e; this.lift.m.position.y = this.lift.y; }

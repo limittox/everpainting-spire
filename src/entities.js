@@ -260,7 +260,8 @@ export class Blot {
       const br = 1 + Math.sin(t * 1.3 + this.ph) * 0.06;
       this.body.scale.set(1 / br, 0.78 * br, 1 / br);
       const dx = player.pos.x - p.x, dz = player.pos.z - p.z;
-      return dx * dx + dz * dz < 6.2 && Math.abs(player.pos.y - p.y) < 3 ? 'wake' : null;
+      // (one that is only drawn in pencil does not wake to company: it has to be given a colour)
+      return !this.thirsty && dx * dx + dz * dz < 6.2 && Math.abs(player.pos.y - p.y) < 3 ? 'wake' : null;
     }
     p.y -= this.off;                                   // (the hop is added back at the end)
     const pp = player.pos, h = player.heading, sh = Math.sin(h), ch = Math.cos(h);

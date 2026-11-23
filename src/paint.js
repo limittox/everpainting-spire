@@ -29,12 +29,14 @@ function indexMesh(mesh) {
   for (let c = 0; c < nx * nz; c++) start[c + 1] += start[c];
   const cursor = start.slice(0, nx * nz), order = new Uint32Array(n);
   for (let i = 0; i < n; i++) order[cursor[cellOf[i]]++] = i;
-  return { pos, color: mesh.geometry.attributes.color, minX, minZ, nx, nz, start, order };
+  // (and how much of the painter's own paint each vertex has taken: the mark that keeps its colour when all other colour goes)
+  const paint = new THREE.BufferAttribute(new Float32Array(n), 1); mesh.geometry.setAttribute('aPaint', paint);
+  return { pos, color: mesh.geometry.attributes.color, paint, minX, minZ, nx, nz, start, order };
 }
 
 export class Painter {
-  constructor(renderer, world) {
-    this.renderer = renderer; this.world = world;
+  constructor(renderer, world, scene) {
+    this.renderer = renderer; this.world = world; this.scene = scene;
     this.grids = world.paintable.map(indexMesh);
     this.queue = [];
     this.patch = document.createElement('canvas'); this.patch.width = this.patch.height = 8;
@@ -90,7 +92,7 @@ export class Painter {
       this.log.push(e);
     }
     if (this.log.length > MAX_LOG) this.log.splice(0, this.log.length - MAX_LOG);
-    for (const isl of dirty.keys()) isl.tex.needsUpdate = true;
+    for (const isl of dirty.keys()) { isl.tex.needsUpdate = true; isl.mask.tex.needsUpdate = true; }
   }
 
   update(dt) {
@@ -105,7 +107,20 @@ export class Painter {
       if (s.objects) this.soak(s.x, s.y, s.z, s.r, s.hex, s.glow);
       else this.ground(s, dirty);
     }
-    for (const [isl, d] of dirty) this.upload(isl, d);
+    for (const [isl, d] of dirty) { this.upload(isl, d); isl.mask.tex.needsUpdate = true; }
+  }
+
+  /**
+   * Where the brush has been, on one island: a small second canvas, white until it is painted on. The ground's
+   * material reads it as a mark (see paintify), so that the painter's strokes can be told from everything else.
+   */
+  mask(isl) {
+    if (isl.mask) return isl.mask;
+    const n = Math.max(256, isl.tex.image.width >> 2), cv = document.createElement('canvas'); cv.width = cv.height = n;
+    const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, n, n); ctx.fillStyle = '#000';
+    const tex = new THREE.CanvasTexture(cv); tex.flipY = isl.tex.flipY;
+    this.scene.traverse((o) => { if (o.material && o.material.map === isl.tex) { o.material.alphaMap = tex; o.material.needsUpdate = true; } });
+    return (isl.mask = { ctx, tex, k: n / isl.tex.image.width });
   }
 
   // ------------------------------------------------------------------ the ground: strokes on the island's canvas
@@ -118,6 +133,8 @@ export class Painter {
     const cv = isl.tex.image, size = cv.width, px = size / isl.span, ctx = isl.ctx || (isl.ctx = cv.getContext('2d'));
     const u = ((s.x - isl.x) / isl.span + 0.5) * size, v = ((s.z - isl.z) / isl.span + 0.5) * size;
     const c = this._c.set(s.hex).offsetHSL(0, 0, s.shade), fill = '#' + c.getHexString();
+    const M = this.mask(isl), k = M.k;
+    M.ctx.beginPath(); M.ctx.ellipse(u * k, v * k, (s.dot ? s.dot : s.len * 0.55) * px * k + 0.5, (s.dot ? s.dot * s.squash : s.w * 0.62) * px * k + 0.5, s.dot ? s.turn : s.ang, 0, 6.3); M.ctx.fill();
     let reach;
     if (s.dot) {
       reach = s.dot * px + 2;
@@ -155,7 +172,7 @@ export class Painter {
     for (const g of this.grids) {
       const c0x = Math.max(0, Math.floor((cx - R - g.minX) / CELL)), c1x = Math.min(g.nx - 1, Math.floor((cx + R - g.minX) / CELL));
       const c0z = Math.max(0, Math.floor((cz - R - g.minZ) / CELL)), c1z = Math.min(g.nz - 1, Math.floor((cz + R - g.minZ) / CELL));
-      const pos = g.pos, arr = g.color.array;
+      const pos = g.pos, arr = g.color.array, mark = g.paint.array;
       let lo = Infinity, hi = -1;
       for (let iz = c0z; iz <= c1z; iz++) for (let ix = c0x; ix <= c1x; ix++) {
         const cell = ix + iz * g.nx;
@@ -171,10 +188,11 @@ export class Painter {
           const tone = 0.8 + 0.4 * hash(hz, hx, hy);
           w *= 0.92;
           arr[i * 3] += (col.r * tone - arr[i * 3]) * w; arr[i * 3 + 1] += (col.g * tone - arr[i * 3 + 1]) * w; arr[i * 3 + 2] += (col.b * tone - arr[i * 3 + 2]) * w;
+          mark[i] = Math.min(1, mark[i] + w * 1.4);
           if (i < lo) lo = i; if (i > hi) hi = i;
         }
       }
-      if (hi >= 0) { g.color.addUpdateRange(lo * 3, (hi - lo + 1) * 3); g.color.needsUpdate = true; }
+      if (hi >= 0) { g.color.addUpdateRange(lo * 3, (hi - lo + 1) * 3); g.color.needsUpdate = true; g.paint.addUpdateRange(lo, hi - lo + 1); g.paint.needsUpdate = true; }
     }
   }
 }

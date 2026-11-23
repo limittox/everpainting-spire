@@ -106,7 +106,7 @@ export class DesertLife {
     // ---- fireflies at the oasis; windows in the far rocks
     this.flies = points(40, 0.7, 0xc8ff8a); this.fly = Array.from({ length: 40 }, () => [rnd() * TAU, 3 + rnd() * 15, 0.6 + rnd() * 3.6, rnd() * TAU, 0.2 + rnd() * 0.5]);
     this.windows = [];
-    for (const [x, z, r, h, y] of env.mesas) { const a = Math.atan2(env.land[0] - x, env.land[1] - z); for (let i = 0; i < 3; i++) { const b = a + (i - 1) * 0.5 + (rnd() - 0.5) * 0.2, hh = (0.3 + i * 0.14 + rnd() * 0.06) * h, rr = r * (1 - 0.28 * (hh / h)) + 0.4; this.windows.push({ g: glow(new V3(x + Math.sin(b) * rr, y + hh, z + Math.cos(b) * rr), 5 + rnd() * 3, 0xffb860), ph: rnd() * TAU }); } }
+    for (const [x, z, r, h, y] of env.mesas) { const a = Math.atan2(env.land[0] - x, env.land[1] - z); for (let i = 0; i < 3; i++) { const b = a + (i - 1) * 0.5 + (rnd() - 0.5) * 0.2, hh = (0.3 + i * 0.14 + rnd() * 0.06) * h, rr = r * (1.09 - 0.28 * (hh / h)) + 0.4; this.windows.push({ g: glow(new V3(x + Math.sin(b) * rr, y + hh, z + Math.cos(b) * rr), 5 + rnd() * 3, 0xffb860), ph: rnd() * TAU }); } }
 
     // ================================================================= wind: sand off the crests, and weeds before it
     this.spin = points(220, 1.5, 0xf6e2b4, false); this.grain = Array.from({ length: 220 }, () => ({ t: rnd() * 1.6, x: 0, y: -999, z: 0, vy: 0 }));
