@@ -48,11 +48,12 @@ const secrets = new Secrets(scene, world);
 const interior = new Interior(scene, world);
 // the second level: a world in pencil, a long way off, reached through a canvas in the atelier
 const under = new Underpainting(scene, world, uTime, interior.center);
-// two more of them are asleep in the Underpainting, drawn in pencil like everything there. Nothing in that world has a
-// colour to lend them: they wake to the brush, and hold whichever colour it was carrying
-for (const p of under.sleepers) { const b = new Blot(scene, p, blots.length); b.thirsty = true; b.mat.color.set(0xcdc9d6); blots.push(b); }
 const seedbed = new Seedbed(scene, world, uTime, under);
-const lastpage = new LastPage(scene, world, uTime, under, seedbed);          // the end of it: old paint to wipe away, four wells, and sunrise          // onward from the Dry Stair: vines, warm air, the Kiln
+const lastpage = new LastPage(scene, world, uTime, under, seedbed);
+// more of them are asleep in the Underpainting, drawn in pencil like everything there: two on the Dry Stair, and one each
+// on the Seedbed, the Kiln and the Blank Page. Nothing in that world has a colour to lend them: they wake to the brush,
+// and hold whichever colour it was carrying
+for (const p of [...under.sleepers, ...seedbed.sleepers, ...lastpage.sleepers]) { const b = new Blot(scene, p, blots.length); b.thirsty = true; b.mat.color.set(0xcdc9d6); blots.push(b); }
 const tubes = new Tubes(scene, world, uTime, seedbed);                           // the picture in it that can be stepped into: three tubes of paint, and mixing
 const gallery = new Gallery(scene, world, uTime, lastpage, interior.center, tubes);
 const dunes = new Dunes(scene, world, uTime); gallery.hang(dunes);                                     // another picture in it: a desert, and a tower to climb                   // the third level: a gallery, and pictures to step into
@@ -573,7 +574,7 @@ resize();
 
 const binds = createKeys($id('binds'));
 /** A line that names a key, with whichever key that now is. */
-const keyed = (text) => (binds.plain ? text : text.replace('<kbd>E</kbd>', '<kbd>' + binds.name('use') + '</kbd>').replace(/\bSpace\b/g, binds.name('jump')).replace(/\bShift\b/g, binds.name('skate')).replace(/hold E\b/, 'hold ' + binds.name('use')));
+const keyed = (text) => (binds.plain ? text : text.replace('<kbd>E</kbd>', '<kbd>' + binds.name('use') + '</kbd>').replace(/\bSpace\b/g, binds.name('jump')).replace(/\bShift\b/g, binds.name('skate')).replace(/hold E\b/, 'hold ' + binds.name('use')).replace(/\bPress ([CGH])\b/, (m, k) => 'Press ' + binds.name({ C: 'photo', G: 'book', H: 'map' }[k])));
 let lastVolume = 0.8;       // what M brings the sound back to
 const settings = createSettings((key, v) => {
   if (key === 'volume') sound.setVolume(v);
@@ -1107,14 +1108,23 @@ function updateEnding(dt, t) {
   }
 }
 
+// A controller, if one is plugged in. Its buttons are the keys they stand for (A jump, X the brush, Y to do the thing in
+// front of you, the left bumper the next paint, unless the settings say otherwise; Start to go on); the left stick walks,
+// the right stick looks, and B or either trigger skates. It is read once a frame, whatever is on the screen: so that
+// the title can be left with it, and a picture saved.
+let pad = null;
+const padWas = [];
+const pb = (i) => !!(pad && pad.buttons[i] && pad.buttons[i].pressed), pa = (i) => (pad && Math.abs(pad.axes[i] || 0) > 0.18 ? pad.axes[i] : 0);
+function readPad() {
+  pad = navigator.getGamepads ? [...navigator.getGamepads()].find((g) => g && g.connected) || null : null;
+  if (!pad) return;
+  const B = binds.pad;
+  if (!game.menu) for (const [i, k] of [[B.jump, 'Space'], [B.paint, 'Attack'], [B.use, 'KeyE'], [B.next, 'KeyQ'], [9, 'Enter']]) if (pb(i) && !padWas[i]) pressed.add(k);          // (not while the settings are up: a button pressed there is being chosen)
+  for (let i = 0; i < pad.buttons.length; i++) padWas[i] = pb(i);
+}
+
 function updatePlay(dt, t) {
   game.playT += dt;
-  // A controller, if one is plugged in. Its buttons are the keys they stand for (A jump, X the brush, Y to do the thing in
-  // front of you, the left bumper the next paint, Start to go on); the left stick walks, the right stick looks, and B or
-  // either trigger skates.
-  const pad = navigator.getGamepads ? [...navigator.getGamepads()].find((g) => g && g.connected) : null, padWas = game.padWas || (game.padWas = []);
-  const pb = (i) => !!(pad && pad.buttons[i] && pad.buttons[i].pressed), pa = (i) => (pad && Math.abs(pad.axes[i] || 0) > 0.18 ? pad.axes[i] : 0);
-  if (pad) { [[0, 'Space'], [2, 'Attack'], [3, 'KeyE'], [4, 'KeyQ'], [9, 'Enter']].forEach(([i, k]) => { if (pb(i) && !padWas[i]) pressed.add(k); }); for (let i = 0; i < 10; i++) padWas[i] = pb(i); }
   if (game.rest) { updateRest(dt, t); return; }
   if (game.scope) { updateScope(dt, t); return; }
   if (game.survey) { updateSurvey(dt, t); return; }
@@ -1123,8 +1133,8 @@ function updatePlay(dt, t) {
   const input = {
     mx: clamp((keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0) + pa(0), -1, 1),
     mz: clamp((keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0) - pa(1), -1, 1),
-    jump: pressed.has('Space'), jumpHeld: keys.has('Space') || pb(0),
-    surf: keys.has('ShiftLeft') || keys.has('ShiftRight') || pb(1) || pb(6) || pb(7),
+    jump: pressed.has('Space'), jumpHeld: keys.has('Space') || pb(binds.pad.jump),
+    surf: keys.has('ShiftLeft') || keys.has('ShiftRight') || pb(binds.pad.skate) || [6, 7].some((i) => pb(i) && !Object.values(binds.pad).includes(i)),
   };
   if (pa(2) || pa(3)) { game.lookIdle = 0; game.yaw -= pa(2) * dt * 2.4; game.pitch = clamp(game.pitch - pa(3) * dt * 1.4, -1.05, 1.15); }
   if (keys.has('ArrowLeft') || keys.has('ArrowRight') || keys.has('ArrowUp') || keys.has('ArrowDown')) game.lookIdle = 0;
@@ -1429,6 +1439,7 @@ function updateFinale(dt, t) {
 hud.show(false);
 let last = performance.now(), time = 0, mapT = 0, shown = false;
 function tick(dt) {
+  readPad();
   if (game.state === 'photo') { updatePhoto(dt); pressed.clear(); return; }       // the world holds still
   time += dt;
   uTime.value = time;

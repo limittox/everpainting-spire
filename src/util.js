@@ -267,7 +267,19 @@ vec3 paintStroke(vec3 base, vec3 wp) {
 }
 `;
 /** Give a built-in material the brush-stroke treatment. */
-export function paintify(mat, { scale = 1, amp = 1 } = {}) {
+/**
+ * A plain solid material that can keep its own colour when the colour goes out of the world: it does, for as long as
+ * mat.userData.keep.value is 1. (The same mark the painter's strokes leave: see paintify, and post.js.)
+ */
+export function kept(mat, on = 0) {
+  mat.userData.keep = { value: on };
+  mat.onBeforeCompile = (sh) => { sh.uniforms.uKeep = mat.userData.keep; sh.fragmentShader = 'uniform float uKeep;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor.a = 1.0 - 0.5 * uKeep;'); };
+  mat.customProgramCacheKey = () => 'kept';
+  return mat;
+}
+
+// ('keep': all of it counts as the painter's own work, brushed or not: a bridge laid, a vine grown, a sketch made real)
+export function paintify(mat, { scale = 1, amp = 1, keep = 0 } = {}) {
   const f = (v) => Number(v).toFixed(3);
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.tStrokes = { value: strokeDataTexture() };
@@ -281,12 +293,12 @@ export function paintify(mat, { scale = 1, amp = 1 } = {}) {
         vWPos = (modelMatrix * wp4).xyz;
         vPaint = aPaint;`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying float vPaint;\n#define STROKE_SCALE ${f(scale)}\n#define STROKE_AMP ${f(amp)}\n` + PAINT_GLSL)
+      .replace('#include <common>', `#include <common>\nvarying float vPaint;\n#define STROKE_SCALE ${f(scale)}\n#define STROKE_AMP ${f(amp)}\n#define PAINT_KEEP ${f(keep)}\n` + PAINT_GLSL)
       .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = paintStroke(diffuseColor.rgb, vWPos);')
       // (a mark, not a colour: where the painter's own brush has been, a solid thing writes a little less than its
       // whole alpha into the picture. Nothing shows of it until the colour goes out of the world: see post.js)
       .replace('#include <alphamap_fragment>', `#include <alphamap_fragment>
-        float paintMark = vPaint;
+        float paintMark = max(vPaint, PAINT_KEEP);
         #ifdef USE_ALPHAMAP
           paintMark = max(paintMark, 1.0 - texture2D(alphaMap, vAlphaMapUv).g);
         #endif`)
@@ -295,7 +307,7 @@ export function paintify(mat, { scale = 1, amp = 1 } = {}) {
           gl_FragColor.a = 1.0 - 0.5 * clamp(paintMark, 0.0, 1.0);
         #endif`);
   };
-  mat.customProgramCacheKey = () => `paint_${f(scale)}_${f(amp)}`;
+  mat.customProgramCacheKey = () => `paint_${f(scale)}_${f(amp)}_${f(keep)}`;
   return mat;
 }
 

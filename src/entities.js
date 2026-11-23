@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PAL, daub, rand, rr, pick, clamp, glowSprite } from './util.js';
+import { PAL, daub, rand, rr, pick, clamp, glowSprite, kept } from './util.js';
 
 const V3 = THREE.Vector3;
 export const SPLASH = ['#ff5a7a', '#ffc040', '#40e0d8', '#b060e0', '#fff4dc', '#ff8a3a', '#5a8af0'];
@@ -202,7 +202,7 @@ const ease = (rate, dt) => 1 - Math.exp(-rate * dt);
 export class Blot {
   constructor(scene, pos, index) {
     this.g = new THREE.Group();
-    this.mat = new THREE.MeshLambertMaterial({ color: 0x3a3548 });
+    this.mat = kept(new THREE.MeshLambertMaterial({ color: 0x3a3548 }));          // (awake, it keeps its colour whatever becomes of the world's)
     this.body = new THREE.Mesh(blotGeo, this.mat); this.body.position.y = 0.7;
     const em = new THREE.MeshBasicMaterial({ color: 0xf4f0ff });
     this.eyes = [new THREE.Mesh(eyeGeo, em), new THREE.Mesh(eyeGeo, em)];
@@ -233,7 +233,7 @@ export class Blot {
     this.napping = false; this.puff = false; this.puffT = 1.5;
   }
   wake(slot) {
-    this.awake = true; this.slot = slot; this.pop = 1;
+    this.awake = true; this.slot = slot; this.pop = 1; this.mat.userData.keep.value = 1;
     this.mat.color.set(this.color); this.mat.emissive.set(this.color).multiplyScalar(0.3);
     this.drips.forEach((d) => { d.visible = false; });
   }

@@ -131,7 +131,7 @@ export class Sketches {
   constructor(scene, world, uTime, keepClear = []) {
     this.scene = scene; this.world = world;
     this.ghostMat = ghostMaterial(uTime);
-    this.realMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, emissive: 0x2a2026 }), { scale: 1.2 });
+    this.realMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, emissive: 0x2a2026 }), { scale: 1.2, keep: 1 });
     this.items = [];
     this.events = [];
     const taken = keepClear.slice();

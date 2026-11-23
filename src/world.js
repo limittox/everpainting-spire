@@ -339,6 +339,7 @@ export function buildWorld(scene, uTime) {
 
   // --- bridges: thick paint strokes between the islands
   const bridges = [];
+  const strokeMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { scale: 1, keep: 1 });          // (a bridge is the painter's own stroke, and keeps its colour as one)
   function makeBridge(a, b, bend, painted, need) {
     const A0 = edgePoint(a, b.x, b.z, 7), A1 = edgePoint(a, b.x, b.z, 1.2);
     const B1 = edgePoint(b, a.x, a.z, 1.2), B0 = edgePoint(b, a.x, a.z, 7);
@@ -348,7 +349,7 @@ export function buildWorld(scene, uTime) {
     const curve = new THREE.CatmullRomCurve3([A0, A1, M1, M2, B1, B0]);
     const N = 76, pts = curve.getSpacedPoints(N);
     const geo = strokeGeo(pts, { width: 5.4, lanes: 7, drips: 1, run: 13 });
-    const mesh = new THREE.Mesh(geo, terrainMat);
+    const mesh = new THREE.Mesh(geo, strokeMat);
     mesh.frustumCulled = false;
     scene.add(mesh);
 

@@ -5,16 +5,17 @@ What still needs adding, changing or fixing. Finished items are deleted, not tic
 
 ## Add
 
-- (noted) The keys that are not in the settings panel yet: sketchbook, photo, map, sound, and looking with the arrows. A controller's buttons cannot be changed either, and the title screen still needs a click or a key with one.
-- (noted) The Underpainting has two sleeping companions now, both on the Dry Stair. The Seedbed, the Kiln and the Blank Page have none.
+- (noted) A few keys are still fixed: Esc, Enter, V and Enter in the photo, P for the brushwork, J as a second key for painting. On a controller, Start is fixed, the sticks cannot be swapped, and the settings panel itself cannot be opened or worked with it.
+- (noted) The Overpainted Place is the one island of the Underpainting with no sleeping companion.
+- (noted) The Sunken Tower: there is nothing to find on top of the rocks in the open desert, and the block left standing on each top cannot be climbed.
 
 ## Change
 
-- (noted) After the portrait, only what the brush itself laid keeps its colour: strokes on the ground of an island, and paint soaked into trees, rocks and walls. What a level colours in its own way (a painted bridge, a spring, a vine, a sketch brought to life, the companions) goes grey with the rest.
-- (noted) The Sunken Tower: the one that wakes has no elbows or knees, so its climb is whole arms and whole legs swinging. Its hand lifts the painter and brings them back; it does not set them down anywhere else.
-- (noted) The Sunken Tower: inside the one that wakes, the wheels on the great axle still turn on their own and drive nothing. The stair wheels and the wall wheels do mesh.
-- (noted) The Sunken Tower: the worm swings wider and narrower from round to round, but always about the same middle. It never leaves its ring, and takes no notice of the painter.
-- (noted) The Sunken Tower: the rocks in the open desert have no floor on top. Nothing reaches that high yet.
+- (noted) After the portrait, these now keep their colour with the brush's own strokes: a painted bridge, a vine, a sketch brought to life, the pool and stream of a painted spring, and the companions that are awake. Still grey with the rest: the falling water of a painted spring, the water, kiln and wells of the Underpainting, and whatever the other pictures colour for themselves.
+- (noted) The Sunken Tower: the hand of the one that wakes does not set the painter down anywhere. At the top it lets them go on a jump, to glide where they like, or brings them back if they wait. Its elbow stays straight while it carries.
+- (noted) The Sunken Tower: inside the one that wakes, each wheel on the great axle now turns a small wheel beside it, but the small wheels turn nothing further, and cannot be stood on.
+- (noted) The Sunken Tower: the worm leaves its round for the painter only on the south and west of it. On the side the painter arrives by (the bells, the arches, the oasis, the camp, the rock to the east) there is no room, and it keeps to its round. It goes over the painter in an arch and on; it does not stop or look. The middle of its round has not moved.
+- (noted) The Sunken Tower: only three of the eight rocks in the open desert are inside the part of it that can be walked or glided over, so only those three tops can be reached.
 
 ## Fix
 
@@ -23,6 +24,15 @@ Nothing known to be broken.
 ## Check by hand
 
 Built and tested by script and still pictures only; nobody has played these yet.
+
+- The keys: the eight new ones in the settings (sketchbook, photo, map, sound, the four arrows), and the hints and the photo bar naming whatever was chosen. A controller: its row appearing in the settings when it is plugged in, choosing a button, and leaving the title with A or Start. All of this was tried with a pretend controller only; no real one was plugged in. With a controller alone the sound may not start until a key or the mouse is pressed.
+- The Underpainting: the three new pencilled sleepers, on the Seedbed, the Kiln and the Blank Page. Seen in stills; one was woken with a swing. Whether a swing meant for one of them also does something unwanted nearby (warm ground on the Seedbed, a well on the Blank Page).
+- After the portrait: bridges, a spring's pool and a woken companion keeping their colour. The bridges and the pool were seen in one still with the grey world forced on; vines, sketches and companions use the same switch and were not looked at.
+- The Sunken Tower: the elbows and knees of the one that wakes, in motion: whether the forearms and shins read as bending, or as coming apart at the joint. Seen in three stills from a distance.
+- The Sunken Tower: let go from its hand at the top: the jump, the glide from there, and reaching a rock top with it. The jump and the glide were checked by numbers; the flight to a rock was not flown.
+- The Sunken Tower: the tops of the rocks: landing on one from a glide, walking to its edge and off, and the block and the shard standing on it. One landing was tried, by dropping the painter onto a top.
+- The Sunken Tower: the worm leaving its round: stood on the south side, it swung 27 out and went over where the painter stood in an arch. Seen in two stills. Not seen: it swinging inward, being caught and ridden where it comes down, and many rounds of it with the painter moving about.
+- The Sunken Tower: the small wheels on the great axle, turning tooth in gap. Seen in two stills; not watched turning.
 
 - The first islands: the three sparks, made easier to find. Whether the paler shaft over a held spark is plain enough from across its island (and not so plain that the leaves, the spring and the easel stop mattering), the throb, and the small bell: whether it helps, and whether it grates when heard for long.
 

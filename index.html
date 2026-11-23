@@ -139,6 +139,9 @@
   /* the keys: a name and the key it has now; press the key to choose another */
   .binds { display: flex; flex-wrap: wrap; gap: 8px 16px; max-width: 520px; margin-top: 20px; font-size: 15px; color: #fbf3ff; }
   .binds label { display: flex; align-items: center; gap: 8px; }
+  .binds .pads { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-top: 8px; border-top: 1px solid rgba(233, 195, 106, 0.25); }
+  .binds .pads[hidden] { display: none; }
+  .binds .pads span { font: 400 12px var(--font-sc); letter-spacing: 1px; color: var(--gold-hi); }
   .overlay .binds button { margin: 0; min-width: 44px; padding: 5px 9px 6px; font: 400 14px var(--font); letter-spacing: 0.4px; color: #efe6ff; background: rgba(26, 18, 54, 0.6); border: 1px solid rgba(233, 195, 106, 0.6); border-radius: 3px; box-shadow: none; text-shadow: none; white-space: nowrap; }
   .overlay .binds button:hover, .overlay .binds button:focus-visible { transform: none; filter: none; background: rgba(255, 240, 192, 0.14); color: #fff; }
   .overlay .binds button[aria-pressed=true] { background: linear-gradient(#fff3cf, #e9c36a); color: #2a1c4a; }
@@ -240,7 +243,7 @@
   <p class="note" id="foundNote" hidden></p>
   <div class="row"><button id="resume">Back to the world</button><button class="quiet" id="again2" hidden>Begin a second journey</button><button class="quiet" id="startOver">Start the painting over</button></div>
   <div class="keys">
-    <span><b>G</b>sketchbook</span><span><b>C</b>photo</span><span><b>H</b>map</span><span><b>M</b>sound on &middot; off</span>
+    <span><b data-act="book">G</b>sketchbook</span><span><b data-act="photo">C</b>photo</span><span><b data-act="map">H</b>map</span><span><b data-act="sound">M</b>sound on &middot; off</span>
   </div>
 </div>
 
@@ -252,7 +255,7 @@
   <div id="book"></div>
   <div class="row"><button id="wander">Keep wandering</button><button class="quiet" id="again" hidden>Begin a second journey</button></div>
 </div>
-<div id="photoBar"><b>Mouse</b>look<b>W A S D</b>move<b>Space · Shift</b>up · down<b>Wheel</b>zoom<b>V</b>hide the painter<b>Enter</b>save<b>C</b>done</div>
+<div id="photoBar"><b>Mouse</b>look<b data-act="fwd left back right">W A S D</b>move<b data-act="jump skate">Space Shift</b>up · down<b>Wheel</b>zoom<b>V</b>hide the painter<b>Enter</b>save<b data-act="photo">C</b>done</div>
 <div id="touch" hidden>
   <div id="stick"><i></i></div>
   <button id="tMenu" data-key="Escape" aria-label="Settings">&#9776;</button>

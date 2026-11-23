@@ -92,6 +92,17 @@ export class Works {
       for (let y = 3; y > -44; y -= 5) b.add(daub(cyl(2.0, 2.0, 0.5, 12, 0, y, 0), BRASS, { scale: 0.3, spread: 0.7 }));
       this.axle = mesh(b); root.add(this.axle);
       world.colliders.push({ x: C.x, z: C.z, r: 1.9, top: C.y + TOP, bottom: C.y - 46.5, late: true });
+      // (Each wheel on it turns a small one beside it, tooth in gap, on a spindle held out from one of the girders: the axle
+      // is what drives everything in here, and this is where it is seen to. Each is [how high, which girder]; they are on
+      // the far side of the axle from whichever wheel of the stair is at that height.)
+      const AR = 5.4, AN = 18, SN = 7, SR = (AR * SN) / AN, d = MESH(AR, SR);
+      this.spurs = [[7, 7], [-7.5, 1], [-22.5, 4], [-37.5, 7], [-45.5, 0]].map(([y, k]) => {
+        const way = (k + 0.5) * (TAU / 8), x = Math.cos(way) * d, z = Math.sin(way) * d, m = mesh(gear(SR, SN, 1.0, false));
+        m.position.set(x, y, z); root.add(m);
+        add(cyl(0.38, 0.38, 2.6, 8, x, y - 0.6, z), IRON); add(cyl(0.7, 0.7, 0.3, 8, x, y + 0.75, z), GILT);
+        add(box(R - 0.6 - d, 0.5, 0.8, Math.cos(way) * (R - 0.6 + d) / 2, y - 1.6, Math.sin(way) * (R - 0.6 + d) / 2, 0, -way), IRON);
+        return { m, way, n: AN, n2: SN };
+      });
     }
     // ---- wheels on the wall, turning on edge; and rods that go up and down in their sleeves
     // (in pairs: a great one and a small one beside it in the same plane, the small one turned by the great one. Each is
@@ -205,7 +216,7 @@ export class Works {
       // whoever stands on a wheel goes round with it
       if (player.grounded && Math.abs(p.y - c.y) < 0.2 && (p.x - c.x) ** 2 + (p.z - c.z) ** 2 < (COG_R + 0.4) ** 2) { const s = Math.sin(c.w * step), k = Math.cos(c.w * step), dx = p.x - c.x, dz = p.z - c.z; p.x = c.x + dx * k - dz * s; p.z = c.z + dx * s + dz * k; player.heading -= c.w * step; }
     }
-    this.axle.rotation.y += 0.22 * step;
+    this.axle.rotation.y += 0.22 * step; for (const s of this.spurs) s.m.rotation.y = driven(this.axle.rotation.y, s.way, s.n, s.n2);
     for (const w of this.wall) { w.m.rotation.y += w.w * step; w.mate.rotation.y = driven(w.m.rotation.y, w.way, w.n, w.n2); }
     for (const r of this.rods) r.m.position.y = r.y + Math.sin(this.ph * 1.7 + r.ph) * 1.6;
     // the lift: slowly up to the eighth wheel and slowly down again, resting a moment at each end; and the steam

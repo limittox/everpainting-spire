@@ -30,7 +30,7 @@ export class Seedbed {
     this.scene = scene; this.world = world; this.under = under; this.uTime = uTime;
     const bag = (this.bag = new Bag()), add = (g, pal, o) => bag.add(daub(g, pal, o));
     this.realMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, emissive: 0x18171c }), { scale: 1.1, amp: 0.5 });
-    this.vineMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { scale: 1 });
+    this.vineMat = paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { scale: 1, keep: 1 });
 
     // --- four more islands in pencil: the Seedbed, two cinders to cross by, and the Kiln
     const island = (def, size, seed) => pencilIsland(scene, world, bag, def, size, seed);
@@ -64,6 +64,9 @@ export class Seedbed {
       const p = on(isl, a, r);
       add(place(new THREE.BoxGeometry(0.7, 1.9, 0.5), p.x, p.y + 0.85, p.z, 0.06, a, 0.08), STONE, { scale: 0.9 });
     }
+
+    // one more of the sleeping ones on each of these two islands, in pencil (see main.js): by the rock, and by the kiln
+    this.sleepers = [on(SEED, 5.0, 15), on(KILN, 3.0, 8)];
 
     // --- growth: two vines, each with a seed at its foot
     this.vines = []; this.seeds = [];

@@ -94,6 +94,7 @@ export class LastPage {
     }
     for (const [a, rad] of [[0.3, 16], [2.0, 17.5], [3.6, 15.5], [5.0, 17]]) { const p = on(page, Math.cos(a) * rad, Math.sin(a) * rad); add(place(new THREE.BoxGeometry(0.7, 1.9, 0.5), p.x, p.y + 0.85, p.z, 0.06, a, 0.08), STONE, { scale: 0.9 }); }
 
+    this.sleepers = [on(page, Math.cos(2.8) * 13, Math.sin(2.8) * 13)];          // (and one asleep on the Blank Page, between two of the wells)
     this.mesh = bag.mesh(paintify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, emissive: 0x18171c }), { scale: 1.1, amp: 0.5 }));
     this.mesh.frustumCulled = false;
     scene.add(this.mesh);

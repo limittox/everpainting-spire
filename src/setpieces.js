@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { rimR, surfY, waterfallMesh } from './world.js';
 import { canvasMaterial, VIEW_W, VIEW_H } from './vista.js';
-import { PAL, daub, place, Bag, paintify, glowSprite, mulberry32 } from './util.js';
+import { PAL, daub, place, Bag, paintify, glowSprite, mulberry32, kept } from './util.js';
 
 // One moment for each of the islands in the middle of the journey, and each of them keeps a spark:
 //   Maple Step       fallen leaves that scatter and swirl when the painter runs, skates or swings through them.
@@ -188,7 +188,7 @@ class Springs {
       const run = rimR(isl, th) - rad - 1.1;
       const geo = new THREE.CircleGeometry(1.55, 22).rotateX(-Math.PI / 2).translate(x, y + 0.2, z);
       const stream = new THREE.PlaneGeometry(0.95, run).rotateX(-Math.PI / 2).rotateY(Math.PI / 2 - th).translate(x + Math.cos(th) * (1.25 + run / 2), y + 0.17, z + Math.sin(th) * (1.25 + run / 2));
-      const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(WATER).multiplyScalar(1.1), fog: false, side: THREE.DoubleSide });
+      const mat = kept(new THREE.MeshBasicMaterial({ color: new THREE.Color(WATER).multiplyScalar(1.1), fog: false, side: THREE.DoubleSide }));          // (once it is painted, its pool keeps the colour it was given)
       const water = new THREE.Group();
       water.add(new THREE.Mesh(geo, mat), new THREE.Mesh(stream, mat));
       scene.add(water);
@@ -212,7 +212,7 @@ class Springs {
   paint(s, hex, glow = 1, instant = false) {
     const u = s.fall.material.uniforms, col = new THREE.Color(hex);
     if (s.flow > 0) { u.tintA.value.copy(u.tintB.value); u.amtA.value = 1; }      // interrupted: the last colour counts as arrived
-    s.hex = hex;
+    s.hex = hex; s.mat.userData.keep.value = 1;
     s.mat.color.copy(col).multiplyScalar(Math.max(1.12, Math.min(glow, 1.5)));
     u.tintB.value.copy(col).multiplyScalar(Math.min(glow, 1.4));
     if (instant) { u.tintA.value.copy(u.tintB.value); u.amtA.value = 1; u.front.value = 0; s.flow = 0; } else { s.flow = 0.001; u.front.value = 0.001; }
