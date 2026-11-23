@@ -24,6 +24,8 @@ Nothing known to be broken.
 
 Built and tested by script and still pictures only; nobody has played these yet.
 
+- The first islands: the three sparks, made easier to find. Whether the paler shaft over a held spark is plain enough from across its island (and not so plain that the leaves, the spring and the easel stop mattering), the throb, and the small bell: whether it helps, and whether it grates when heard for long.
+
 - After the portrait: the painter's strokes as the only colour. Seen in one still on the first island with the grey world forced on; not seen at the real ending, in the gallery or in the other pictures. The first swing on each island may hitch for a moment (its ground is told about the mark then).
 - The keys in the settings: changing one with a real key press, two keys changing places, and the prompts and hints naming the new key.
 - The Underpainting's two pencilled sleepers: waking one with a real swing, the colour it keeps, and whether it follows into the other places like the rest.

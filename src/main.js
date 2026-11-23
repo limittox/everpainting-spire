@@ -1191,6 +1191,14 @@ function updatePlay(dt, t) {
 
   // pickups
   for (const s of sparks) if (!s.taken && !s.locked && s.k > 0.75 && s.g.position.distanceTo(player.pos) < 2.6) collectSpark(s);       // (a freed spark takes a moment to rise)
+  // (and one that has not been taken can be heard before it is seen: a small bell, clearer and quicker the nearer it is)
+  {
+    let near = 1e9; for (const s of sparks) if (!s.taken && s.g.visible) near = Math.min(near, s.g.position.distanceTo(player.pos));
+    // (and motes of light go up the shaft over each, a few at a time: something moving is seen before something still)
+    if ((game.sparkMote = (game.sparkMote || 0) - dt) <= 0) { game.sparkMote = 0.16; for (const s of sparks) if (!s.taken && s.g.visible && s.g.position.distanceToSquared(player.pos) < 140 * 140) fx.emit(tmp.set(s.g.position.x + (Math.random() - 0.5) * 1.6, s.g.position.y + Math.random() * 6, s.g.position.z + (Math.random() - 0.5) * 1.6), 0, 3 + Math.random() * 2.5, 0, Math.random() < 0.5 ? '#ffe9a8' : '#fff6e2', 0.3, 3.2, 0, 1.7); }
+    game.sparkCall = (game.sparkCall || 0) - dt;
+    if (near < 40 && game.sparkCall <= 0 && sound.ctx) { game.sparkCall = 1 + near * 0.06; sound.bell(near < 14 ? 1760 : 1174.66, sound.ctx.currentTime, 0.01 + 0.05 * (1 - near / 40) ** 2, 1.5); }
+  }
   if (heapSpark.locked && !heapSpark.taken && heapSpark.g.position.distanceTo(player.pos) < 9) hint('heap', 'Something is glowing under the leaves.', 7000);
   if (springSpark.locked && !springSpark.taken && springSpark.g.position.distanceTo(player.pos) < 9) hint('spring', 'A spark is caught in the spring. Give the water a colour.', 7500);
   for (const d of drops.items) {

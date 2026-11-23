@@ -38,7 +38,7 @@ On a phone or tablet: the left thumb walks (a stick appears wherever it comes do
 ## What there is to do
 
 - **Paint.** Every swing lays real strokes into the ground and soaks colour into trees, rocks and walls. Flowers come up where you walk.
-- **Follow the route.** Paint the sketched bridges, gather three sparks of inspiration, and reach the Spire.
+- **Follow the route.** Paint the sketched bridges, gather three sparks of inspiration, and reach the Spire. Each spark has a shaft of light standing over it from the first, and a small bell that sounds clearer the nearer you are; each is held by something that has to be seen to before it can be taken.
 - **Rest.** Sit at an easel and the painter paints the view in front of it. Each finished picture is yours to save.
 - **Look around.** There are sleeping companions to wake, sketches waiting to be painted into being, springs that colour their waterfalls, and a few places no path leads to.
 - **Keep going.** The ending opens more of the world, and a second journey lets you start again with what you earned.

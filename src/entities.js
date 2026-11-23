@@ -137,7 +137,10 @@ export class Spark {
     this.ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.04, 5, 18), new THREE.MeshBasicMaterial({ color: 0xff8ab0, fog: false }));
     this.beam = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.45, 34, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd890, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
     this.beam.position.y = 17;
-    this.g.add(this.core, this.ring, this.ring2, this.beam, glowSprite(glowTex, 6.5, 0xffc870, 0.95));
+    this.body = [this.core, this.ring, this.ring2, glowSprite(glowTex, 6.5, 0xffc870, 0.95)];
+    // (round the bright thread of it, a broad soft shaft: a thread alone is lost against a pale sky, and under the knife)
+    this.shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.7, 34, 10, 1, true), new THREE.MeshBasicMaterial({ color: 0xffc860, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    this.g.add(...this.body, this.beam, this.shaft); this.home = pos.clone();
     scene.add(this.g); this.taken = false;
     this.locked = false;       // held by something (under leaves, in a spring): it glints, but cannot be taken yet
     this.hidden = false;       // not there at all yet
@@ -145,13 +148,21 @@ export class Spark {
     this.k = 1;                // 0 held .. 1 free
   }
   /** Where it floats (its ground position; it hovers a little above). */
-  moveTo(p) { this.g.position.copy(p); this.base = p.y + 1.5; }
+  moveTo(p) { this.g.position.copy(p); this.home.copy(p); this.base = p.y + 1.5; }
   update(t, dt = 0.016) {
     this.k += ((this.locked ? 0 : 1) - this.k) * (1 - Math.exp(-2.4 * dt));
-    this.g.visible = !this.hidden;
-    this.g.scale.setScalar(0.32 + 0.68 * this.k);
-    this.beam.visible = this.k > 0.6;
-    this.g.position.y = this.base - (1 - this.k) * 1.2 + Math.sin(t * 1.7) * 0.25 * this.k;
+    // A spark is to be found, so it can be seen from across its island before anything has been done about it. Held, it
+    // is half its size and throbs, and the shaft of light already stands over it, thinner and paler than it will be.
+    // One that is not there at all yet has only the shaft, standing over whatever must be seen to first.
+    const ghost = this.hidden && !!this.lure, held = 1 - this.k, s = (0.5 + 0.5 * this.k) * (1 + 0.14 * held * Math.sin(t * 3.4)), w = 1 / s, tall = 1.5 / s;
+    this.g.visible = !this.hidden || ghost;
+    for (const m of this.body) m.visible = !ghost;
+    this.g.scale.setScalar(s);
+    for (const m of [this.beam, this.shaft]) { m.scale.set(w, tall, w); m.position.y = 17 * tall; }          // (the shaft keeps its size whatever size the spark is)
+    this.beam.material.opacity = (0.34 + 0.1 * this.k) * (0.85 + 0.15 * Math.sin(t * 2.1)); this.shaft.material.opacity = 0.17 + 0.05 * Math.sin(t * 1.3);
+    if (ghost) { this.g.position.set(this.lure.x, this.lure.y - 3, this.lure.z); this.ghosted = true; return; }
+    if (this.ghosted) { this.g.position.x = this.home.x; this.g.position.z = this.home.z; this.ghosted = false; }
+    this.g.position.y = this.base - held * 0.5 + Math.sin(t * 1.7) * 0.25 * this.k;
     this.ring.rotation.set(t * 1.2, t * 0.8, 0); this.ring2.rotation.set(-t * 0.9, 0, t * 1.1);
     this.core.rotation.y = t * 2;
   }
